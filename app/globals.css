@@ -2,6 +2,17 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Hide scrollbars for all elements */
+* {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none;  /* Internet Explorer 10+ */
+}
+
+/* Hide scrollbars for WebKit browsers (Chrome, Safari, etc) */
+*::-webkit-scrollbar {
+  display: none;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -100,5 +111,73 @@
   /* Ensure numbers don't get cut off */
   .recharts-cartesian-axis-tick {
     padding: 0 2px;
+  }
+}
+
+.dark {
+  /* Fix for white popups and panels */
+  .bg-white,
+  [class*="bg-white"],
+  .hover\:bg-white:hover {
+    @apply bg-gray-800 text-gray-100;
+  }
+
+  /* Fix for search results and dropdown items */
+  .search-result-item,
+  .dropdown-item,
+  .popup-panel,
+  .command-item {
+    @apply bg-gray-800 text-gray-100 border-gray-700;
+  }
+
+  /* Fix hover states */
+  .hover\:bg-gray-100:hover {
+    @apply bg-gray-700 text-gray-100;
+  }
+
+  /* Fix for white panels and cards */
+  .card,
+  .panel,
+  .white-panel {
+    @apply bg-gray-800 text-gray-100 border-gray-700;
+  }
+
+  /* Fix for table rows and cells */
+  tr,
+  td,
+  th {
+    @apply border-gray-700;
+  }
+
+  tr:hover {
+    @apply bg-gray-700;
+  }
+
+  /* Fix for inputs and form elements */
+  input,
+  select,
+  textarea {
+    @apply bg-gray-800 text-gray-100 border-gray-700;
+  }
+
+  /* Fix for buttons */
+  button.bg-white,
+  button.hover\:bg-white:hover {
+    @apply bg-gray-700 text-gray-100 hover:bg-gray-600;
+  }
+
+  /* Fix for radio buttons and checkboxes */
+  input[type="radio"],
+  input[type="checkbox"] {
+    @apply border-gray-600;
+  }
+
+  /* Fix for calendar and date picker */
+  .calendar-month button {
+    @apply text-gray-300 hover:bg-gray-700;
+  }
+
+  .calendar-month button:disabled {
+    @apply text-gray-600;
   }
 }

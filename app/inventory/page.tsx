@@ -1,17 +1,24 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { useStore } from "@/store/store"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { useState } from "react";
+import { useStore } from "@/store/store";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -19,19 +26,21 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ChevronDown, Edit, Search } from "lucide-react"
-import type { Product } from "@/types"
+} from "@/components/ui/dialog";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ChevronDown, Edit, Search } from "lucide-react";
+import type { Product } from "@/types";
 
 export default function InventoryPage() {
-  const { products, updateProduct } = useStore()
-  const [searchQuery, setSearchQuery] = useState("")
-  const [categoryFilter, setCategoryFilter] = useState<string | null>(null)
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
-  const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false)
-  const [updatedInventory, setUpdatedInventory] = useState<Record<string, number>>({})
+  const { products, updateProduct } = useStore();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
+  const [updatedInventory, setUpdatedInventory] = useState<
+    Record<string, number>
+  >({});
 
   // Get all variants from all products
   const allVariants = products.flatMap((product) =>
@@ -40,72 +49,83 @@ export default function InventoryPage() {
       productId: product.id,
       productTitle: product.title,
       productThumbnail: product.thumbnail,
-    })),
-  )
+    }))
+  );
 
   const filteredProducts = products.filter((product) => {
     const matchesSearch =
       product.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       product.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      product.category.toLowerCase().includes(searchQuery.toLowerCase())
+      product.category.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const matchesCategory = categoryFilter ? product.category === categoryFilter : true
+    const matchesCategory = categoryFilter
+      ? product.category === categoryFilter
+      : true;
 
-    return matchesSearch && matchesCategory
-  })
+    return matchesSearch && matchesCategory;
+  });
 
   const filteredVariants = allVariants.filter((variant) => {
-    const product = products.find((p) => p.id === variant.productId)
-    if (!product) return false
+    const product = products.find((p) => p.id === variant.productId);
+    if (!product) return false;
 
     const matchesSearch =
       product.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       variant.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      variant.sku.toLowerCase().includes(searchQuery.toLowerCase())
+      variant.sku.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const matchesCategory = categoryFilter ? product.category === categoryFilter : true
+    const matchesCategory = categoryFilter
+      ? product.category === categoryFilter
+      : true;
 
-    return matchesSearch && matchesCategory
-  })
+    return matchesSearch && matchesCategory;
+  });
 
   const handleUpdateInventory = () => {
-    if (!selectedProduct) return
+    if (!selectedProduct) return;
 
     // Update product inventory (sum of all variants)
     const totalInventory = selectedProduct.variants.reduce((sum, variant) => {
       const updatedVariantInventory =
-        updatedInventory[variant.id] !== undefined ? updatedInventory[variant.id] : variant.inventory
-      return sum + updatedVariantInventory
-    }, 0)
+        updatedInventory[variant.id] !== undefined
+          ? updatedInventory[variant.id]
+          : variant.inventory;
+      return sum + updatedVariantInventory;
+    }, 0);
 
     // Update product and its variants
     updateProduct(selectedProduct.id, {
       inventory: totalInventory,
       variants: selectedProduct.variants.map((variant) => ({
         ...variant,
-        inventory: updatedInventory[variant.id] !== undefined ? updatedInventory[variant.id] : variant.inventory,
+        inventory:
+          updatedInventory[variant.id] !== undefined
+            ? updatedInventory[variant.id]
+            : variant.inventory,
       })),
-    })
+    });
 
-    setIsUpdateDialogOpen(false)
-    setUpdatedInventory({})
-  }
+    setIsUpdateDialogOpen(false);
+    setUpdatedInventory({});
+  };
 
   const handleEditInventory = (product: Product) => {
-    setSelectedProduct(product)
+    setSelectedProduct(product);
 
     // Initialize updatedInventory with current values
-    const initialInventory: Record<string, number> = {}
+    const initialInventory: Record<string, number> = {};
     product.variants.forEach((variant) => {
-      initialInventory[variant.id] = variant.inventory
-    })
+      initialInventory[variant.id] = variant.inventory;
+    });
 
-    setUpdatedInventory(initialInventory)
-    setIsUpdateDialogOpen(true)
-  }
+    setUpdatedInventory(initialInventory);
+    setIsUpdateDialogOpen(true);
+  };
 
   // Get unique categories
-  const categories = Array.from(new Set(products.map((product) => product.category)))
+  const categories = Array.from(
+    new Set(products.map((product) => product.category))
+  );
 
   return (
     <div className="flex-1 space-y-4 p-4 pt-6 md:p-8">
@@ -132,10 +152,15 @@ export default function InventoryPage() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => setCategoryFilter(null)}>All Categories</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setCategoryFilter(null)}>
+              All Categories
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             {categories.map((category) => (
-              <DropdownMenuItem key={category} onClick={() => setCategoryFilter(category)}>
+              <DropdownMenuItem
+                key={category}
+                onClick={() => setCategoryFilter(category)}
+              >
                 {category}
               </DropdownMenuItem>
             ))}
@@ -163,10 +188,13 @@ export default function InventoryPage() {
               <TableBody>
                 {filteredProducts.map((product) => (
                   <TableRow key={product.id}>
-                    
-                    <TableCell className="font-medium">{product.title}</TableCell>
+                    <TableCell className="font-medium">
+                      {product.title}
+                    </TableCell>
                     <TableCell>
-                      {product.variants.length > 0 ? `${product.variants.length} variants` : "No variants"}
+                      {product.variants.length > 0
+                        ? `${product.variants.length} variants`
+                        : "No variants"}
                     </TableCell>
                     <TableCell className="text-right">
                       <span
@@ -174,8 +202,8 @@ export default function InventoryPage() {
                           product.inventory < 10
                             ? "bg-red-100 text-red-800"
                             : product.inventory < 30
-                              ? "bg-yellow-100 text-yellow-800"
-                              : "bg-green-100 text-green-800"
+                            ? "bg-yellow-100 text-yellow-800"
+                            : "bg-green-100 text-green-800"
                         }`}
                       >
                         {product.inventory}
@@ -214,7 +242,9 @@ export default function InventoryPage() {
                 {filteredVariants.map((variant) => (
                   <TableRow key={variant.id}>
                     <TableCell>{variant.productTitle}</TableCell>
-                    <TableCell className="font-medium">{variant.title}</TableCell>
+                    <TableCell className="font-medium">
+                      {variant.title}
+                    </TableCell>
                     <TableCell>{variant.sku}</TableCell>
                     <TableCell className="text-right">
                       <span
@@ -222,8 +252,8 @@ export default function InventoryPage() {
                           variant.inventory < 10
                             ? "bg-red-100 text-red-800"
                             : variant.inventory < 30
-                              ? "bg-yellow-100 text-yellow-800"
-                              : "bg-green-100 text-green-800"
+                            ? "bg-yellow-100 text-yellow-800"
+                            : "bg-green-100 text-green-800"
                         }`}
                       >
                         {variant.inventory}
@@ -242,7 +272,9 @@ export default function InventoryPage() {
           <DialogHeader>
             <DialogTitle>Update Inventory</DialogTitle>
             <DialogDescription>
-              {selectedProduct && <span>Update inventory for {selectedProduct.title}</span>}
+              {selectedProduct && (
+                <span>Update inventory for {selectedProduct.title}</span>
+              )}
             </DialogDescription>
           </DialogHeader>
 
@@ -254,10 +286,15 @@ export default function InventoryPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {selectedProduct.variants.map((variant) => (
-                    <div key={variant.id} className="flex items-center justify-between">
+                    <div
+                      key={variant.id}
+                      className="flex items-center justify-between"
+                    >
                       <div>
                         <p className="font-medium">{variant.title}</p>
-                        <p className="text-sm text-muted-foreground">{variant.sku}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {variant.sku}
+                        </p>
                       </div>
                       <div className="flex items-center space-x-2">
                         <Button
@@ -267,12 +304,12 @@ export default function InventoryPage() {
                             const currentValue =
                               updatedInventory[variant.id] !== undefined
                                 ? updatedInventory[variant.id]
-                                : variant.inventory
+                                : variant.inventory;
                             if (currentValue > 0) {
                               setUpdatedInventory({
                                 ...updatedInventory,
                                 [variant.id]: currentValue - 1,
-                              })
+                              });
                             }
                           }}
                         >
@@ -287,12 +324,12 @@ export default function InventoryPage() {
                               : variant.inventory
                           }
                           onChange={(e) => {
-                            const value = Number.parseInt(e.target.value)
+                            const value = Number.parseInt(e.target.value);
                             if (!isNaN(value) && value >= 0) {
                               setUpdatedInventory({
                                 ...updatedInventory,
                                 [variant.id]: value,
-                              })
+                              });
                             }
                           }}
                         />
@@ -303,11 +340,11 @@ export default function InventoryPage() {
                             const currentValue =
                               updatedInventory[variant.id] !== undefined
                                 ? updatedInventory[variant.id]
-                                : variant.inventory
+                                : variant.inventory;
                             setUpdatedInventory({
                               ...updatedInventory,
                               [variant.id]: currentValue + 1,
-                            })
+                            });
                           }}
                         >
                           +
@@ -321,7 +358,10 @@ export default function InventoryPage() {
           )}
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsUpdateDialogOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setIsUpdateDialogOpen(false)}
+            >
               Cancel
             </Button>
             <Button onClick={handleUpdateInventory}>Update Inventory</Button>
@@ -329,5 +369,5 @@ export default function InventoryPage() {
         </DialogContent>
       </Dialog>
     </div>
-  )
+  );
 }
