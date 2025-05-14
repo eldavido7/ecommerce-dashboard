@@ -1,24 +1,25 @@
 "use client";
 
+import type React from "react";
+
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 
-export default function Home() {
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const { user, isLoading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (!isLoading) {
-      if (user) {
-        router.push("/dashboard");
-      } else {
-        router.push("/login");
-      }
+    if (!isLoading && !user) {
+      router.push("/login");
     }
   }, [user, isLoading, router]);
 
-  // Show loading spinner while checking auth
   if (isLoading) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
@@ -27,5 +28,9 @@ export default function Home() {
     );
   }
 
-  return null;
+  if (!user) {
+    return null;
+  }
+
+  return <>{children}</>;
 }

@@ -1,18 +1,52 @@
-"use client"
+"use client";
 
-import type React from "react"
+import type React from "react";
 
-import { useState } from "react"
-import { Sidebar } from "@/components/sidebar"
-import { Header } from "@/components/header"
-import { ScrollArea } from "@/components/ui/scroll-area"
+import { useState, useEffect } from "react";
+import { Sidebar } from "@/components/sidebar";
+import { Header } from "@/components/header";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { usePathname, useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/auth-context";
 
 interface MainLayoutProps {
-  children: React.ReactNode
+  children: React.ReactNode;
 }
 
 export function MainLayout({ children }: MainLayoutProps) {
-  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const pathname = usePathname();
+  const { user, isLoading } = useAuth();
+  const router = useRouter();
+
+  // Check if we're on the login page
+  const isLoginPage = pathname === "/login";
+
+  // Redirect to login if not authenticated and not already on login page
+  useEffect(() => {
+    if (!isLoading && !user && !isLoginPage) {
+      router.push("/login");
+    }
+  }, [user, isLoading, isLoginPage, router]);
+
+  // If we're on the login page, don't wrap with the dashboard layout
+  if (isLoginPage) {
+    return <>{children}</>;
+  }
+
+  // Show loading state while checking authentication
+  if (isLoading) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
+      </div>
+    );
+  }
+
+  // Don't render anything if not authenticated and not on login page
+  if (!user && !isLoginPage) {
+    return null;
+  }
 
   return (
     <div className="grid min-h-screen grid-rows-[auto_1fr] bg-background">
@@ -26,5 +60,5 @@ export function MainLayout({ children }: MainLayoutProps) {
         </main>
       </div>
     </div>
-  )
+  );
 }
