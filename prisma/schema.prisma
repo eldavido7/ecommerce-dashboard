@@ -1,0 +1,21 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Product {
+  id          String   @id           // Nano ID will be generated in code
+  title       String
+  description String
+  price       Int                   // Naira in full units (e.g., 1500 = ₦1500)
+  inventory   Int
+  category    String
+  tags        String[]
+  barcode     String   @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

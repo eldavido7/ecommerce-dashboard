@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useStore } from "@/store/store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  Barcode,
   ChevronDown,
   Edit,
   MoreHorizontal,
@@ -32,15 +33,36 @@ import type { Product } from "@/types";
 import { AddProductModal } from "./components/add-product-modal";
 import { EditProductModal } from "./components/edit-product-modal";
 import { DeleteProductModal } from "./components/delete-product-modal";
+import { BarcodeModal } from "./components/barcode-modal";
 
 export default function ProductsPage() {
-  const { products, addProduct, updateProduct, deleteProduct, orders } =
-    useStore();
+  const {
+    products,
+    fetchProducts,
+    addProduct,
+    updateProduct,
+    deleteProduct,
+    orders,
+  } = useStore();
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isBarcodeDialogOpen, setIsBarcodeDialogOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchProducts();
+  }, []);
+
+  useEffect(() => {
+    fetchProducts().finally(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return <div className="p-8 text-muted-foreground">Loading products...</div>;
+  }
 
   const filteredProducts = products.filter(
     (product) =>
@@ -162,6 +184,15 @@ export default function ProductsPage() {
                         <Trash className="mr-2 h-4 w-4" />
                         Delete
                       </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setSelectedProduct(product);
+                          setIsBarcodeDialogOpen(true);
+                        }}
+                      >
+                        <Barcode className="mr-2 h-4 w-4" />
+                        View Barcode
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </TableCell>
@@ -191,6 +222,13 @@ export default function ProductsPage() {
         product={selectedProduct}
         orders={orders}
         onDeleteProduct={deleteProduct}
+      />
+
+      <BarcodeModal
+        open={isBarcodeDialogOpen}
+        onOpenChange={setIsBarcodeDialogOpen}
+        product={selectedProduct}
+        onUpdateProduct={updateProduct}
       />
     </div>
   );

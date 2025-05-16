@@ -1,11 +1,17 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -13,17 +19,21 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { toast } from "@/components/ui/use-toast"
-import type { Product } from "@/types"
+} from "@/components/ui/dialog";
+import { toast } from "@/components/ui/use-toast";
+import type { Product } from "@/types";
 
 interface AddProductModalProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  onAddProduct: (product: Product) => void
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onAddProduct: (product: Product) => void;
 }
 
-export function AddProductModal({ open, onOpenChange, onAddProduct }: AddProductModalProps) {
+export function AddProductModal({
+  open,
+  onOpenChange,
+  onAddProduct,
+}: AddProductModalProps) {
   const [productForm, setProductForm] = useState<Partial<Product>>({
     title: "",
     description: "",
@@ -31,29 +41,29 @@ export function AddProductModal({ open, onOpenChange, onAddProduct }: AddProduct
     inventory: 0,
     category: "",
     tags: [],
-    variants: [],
-  })
+    barcode: "",
+  });
 
   const handleAddProduct = () => {
-    const productToAdd = {
-      ...productForm,
-      id: `prod_${Math.random().toString(36).substring(2, 10)}`,
-      thumbnail: "/diverse-products-still-life.png",
-      variants: [],
-      createdAt: new Date(),
-      updatedAt: new Date(),
+    const productData = {
+      title: productForm.title,
+      description: productForm.description,
+      price: productForm.price,
+      inventory: productForm.inventory,
+      category: productForm.category,
       tags: productForm.tags || [],
-    } as Product
+      barcode: productForm.barcode || "",
+    };
 
-    onAddProduct(productToAdd)
-    onOpenChange(false)
-    resetForm()
+    onAddProduct(productData); // no id, no dates
+    onOpenChange(false);
+    resetForm();
 
     toast({
       title: "Product Added",
-      description: `${productToAdd.title} has been added successfully.`,
-    })
-  }
+      description: `${productForm.title} has been added successfully.`,
+    });
+  };
 
   const resetForm = () => {
     setProductForm({
@@ -63,16 +73,18 @@ export function AddProductModal({ open, onOpenChange, onAddProduct }: AddProduct
       inventory: 0,
       category: "",
       tags: [],
-      variants: [],
-    })
-  }
+      barcode: "",
+    });
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add New Product</DialogTitle>
-          <DialogDescription>Fill in the details to add a new product to your inventory.</DialogDescription>
+          <DialogDescription>
+            Fill in the details to add a new product to your inventory.
+          </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid grid-cols-4 items-center gap-4">
@@ -82,7 +94,9 @@ export function AddProductModal({ open, onOpenChange, onAddProduct }: AddProduct
             <Input
               id="title"
               value={productForm.title}
-              onChange={(e) => setProductForm({ ...productForm, title: e.target.value })}
+              onChange={(e) =>
+                setProductForm({ ...productForm, title: e.target.value })
+              }
               className="col-span-3"
             />
           </div>
@@ -93,7 +107,9 @@ export function AddProductModal({ open, onOpenChange, onAddProduct }: AddProduct
             <Textarea
               id="description"
               value={productForm.description}
-              onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
+              onChange={(e) =>
+                setProductForm({ ...productForm, description: e.target.value })
+              }
               className="col-span-3"
             />
           </div>
@@ -105,7 +121,12 @@ export function AddProductModal({ open, onOpenChange, onAddProduct }: AddProduct
               id="price"
               type="number"
               value={productForm.price}
-              onChange={(e) => setProductForm({ ...productForm, price: Number.parseFloat(e.target.value) })}
+              onChange={(e) =>
+                setProductForm({
+                  ...productForm,
+                  price: Number.parseFloat(e.target.value),
+                })
+              }
               className="col-span-3"
             />
           </div>
@@ -117,7 +138,12 @@ export function AddProductModal({ open, onOpenChange, onAddProduct }: AddProduct
               id="inventory"
               type="number"
               value={productForm.inventory}
-              onChange={(e) => setProductForm({ ...productForm, inventory: Number.parseInt(e.target.value) })}
+              onChange={(e) =>
+                setProductForm({
+                  ...productForm,
+                  inventory: Number.parseInt(e.target.value),
+                })
+              }
               className="col-span-3"
             />
           </div>
@@ -126,7 +152,9 @@ export function AddProductModal({ open, onOpenChange, onAddProduct }: AddProduct
               Category
             </Label>
             <Select
-              onValueChange={(value) => setProductForm({ ...productForm, category: value })}
+              onValueChange={(value) =>
+                setProductForm({ ...productForm, category: value })
+              }
               defaultValue={productForm.category}
             >
               <SelectTrigger className="col-span-3">
@@ -149,7 +177,12 @@ export function AddProductModal({ open, onOpenChange, onAddProduct }: AddProduct
               id="tags"
               placeholder="Comma separated tags"
               value={productForm.tags?.join(",")}
-              onChange={(e) => setProductForm({ ...productForm, tags: e.target.value.split(",") })}
+              onChange={(e) =>
+                setProductForm({
+                  ...productForm,
+                  tags: e.target.value.split(","),
+                })
+              }
               className="col-span-3"
             />
           </div>
@@ -162,5 +195,5 @@ export function AddProductModal({ open, onOpenChange, onAddProduct }: AddProduct
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

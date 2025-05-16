@@ -4,10 +4,11 @@ import { mockProducts, mockOrders, mockDiscounts, mockGiftCards } from "@/lib/mo
 
 interface StoreState {
   // Products
-  products: Product[]
-  addProduct: (product: Product) => void
-  updateProduct: (id: string, product: Partial<Product>) => void
-  deleteProduct: (id: string) => void
+  products: Product[];
+  fetchProducts: () => Promise<void>;
+  addProduct: (product: Omit<Product, "id" | "createdAt">) => Promise<void>;
+  updateProduct: (id: string, product: Partial<Product>) => Promise<void>;
+  deleteProduct: (id: string) => Promise<void>;
 
   // Orders
   orders: Order[]
@@ -30,19 +31,54 @@ interface StoreState {
 
 export const useStore = create<StoreState>((set) => ({
   // Products
-  products: mockProducts,
-  addProduct: (product) =>
+  products: [],
+
+  fetchProducts: async () => {
+    const res = await fetch("/api/products");
+    const data = await res.json();
+    set({ products: data });
+  },
+
+  addProduct: async (product: Omit<Product, "id" | "createdAt">) => {
+    try {
+      const res = await fetch("/api/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(product),
+      });
+
+      if (!res.ok) throw new Error("Failed to add product");
+
+      // Refetch all products after successful add
+      const updatedRes = await fetch("/api/products");
+      const updatedProducts = await updatedRes.json();
+      set({ products: updatedProducts });
+    } catch (error) {
+      console.error("[ADD_PRODUCT_STORE]", error);
+    }
+  },
+
+  updateProduct: async (id, updatedProduct) => {
+    await fetch(`/api/products/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(updatedProduct),
+      headers: { "Content-Type": "application/json" },
+    });
     set((state) => ({
-      products: [...state.products, product],
-    })),
-  updateProduct: (id, updatedProduct) =>
+      products: state.products.map((p) =>
+        p.id === id ? { ...p, ...updatedProduct } : p
+      ),
+    }));
+  },
+
+  deleteProduct: async (id) => {
+    await fetch(`/api/products/${id}`, {
+      method: "DELETE",
+    });
     set((state) => ({
-      products: state.products.map((product) => (product.id === id ? { ...product, ...updatedProduct } : product)),
-    })),
-  deleteProduct: (id) =>
-    set((state) => ({
-      products: state.products.filter((product) => product.id !== id),
-    })),
+      products: state.products.filter((p) => p.id !== id),
+    }));
+  },
 
   // Orders
   orders: mockOrders,

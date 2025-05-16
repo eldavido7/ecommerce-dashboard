@@ -3,26 +3,13 @@ export interface Product {
   id: string
   title: string
   description: string
-  thumbnail: string
   price: number
   inventory: number
   category: string
   tags: string[]
-  variants: ProductVariant[]
+  barcode: String
   createdAt: Date
   updatedAt: Date
-}
-
-export interface ProductVariant {
-  id: string
-  title: string
-  sku: string
-  price: number
-  inventory: number
-  options: {
-    name: string
-    value: string
-  }[]
 }
 
 // Order Types
