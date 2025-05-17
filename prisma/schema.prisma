@@ -8,7 +8,7 @@ datasource db {
 }
 
 model Product {
-  id          String   @id           // Nano ID will be generated in code
+  id        String   @id @default(uuid())           // Nano ID will be generated in code
   title       String
   description String
   price       Int                   // Naira in full units (e.g., 1500 = ₦1500)
@@ -17,5 +17,5 @@ model Product {
   tags        String[]
   barcode     String   @unique
   createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  updatedAt DateTime @updatedAt @default(now())
 }
