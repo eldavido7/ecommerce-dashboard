@@ -43,7 +43,7 @@ export interface Order {
   id: string;
   customerDetails: CustomerDetails;
   items: OrderItem[];
-  status: "pending" | "processing" | "shipped" | "delivered" | "canceled";
+  status: "PENDING" | "PROCESSING" | "SHIPPED" | "DELIVERED" | "CANCELED";
   total: number;
   createdAt: Date;
   updatedAt: Date;

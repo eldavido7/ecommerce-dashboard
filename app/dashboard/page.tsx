@@ -22,6 +22,7 @@ import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import dynamic from "next/dynamic";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useEffect, useState } from "react";
 
 // Import charts with dynamic imports and disable SSR
 const LineChart = dynamic(() => import("@/components/charts/line-chart"), {
@@ -39,9 +40,92 @@ const DonutChart = dynamic(() => import("@/components/charts/donut-chart"), {
 
 export default function Dashboard() {
   const { products, orders } = useStore();
+  const [ordersLoading, setOrdersLoading] = useState(true);
+  const [productsLoading, setProductsLoading] = useState(true);
+
+  useEffect(() => {
+    const orders = useStore.getState().orders;
+    if (!orders || orders.length === 0) {
+      useStore
+        .getState()
+        .fetchOrders()
+        .then(() => {
+          const updatedOrders = useStore.getState().orders;
+          console.log("[FETCHED_ORDERS]", updatedOrders);
+          setOrdersLoading(false);
+        });
+    } else {
+      setOrdersLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const products = useStore.getState().products;
+    if (!products || products.length === 0) {
+      useStore
+        .getState()
+        .fetchProducts()
+        .then(() => {
+          const updatedProducts = useStore.getState().products;
+          console.log("[FETCHED_PRODUCTS]", updatedProducts);
+          setProductsLoading(false);
+        });
+    } else {
+      setProductsLoading(false);
+    }
+  }, []);
+
+  if (ordersLoading || productsLoading) {
+    return (
+      <div className="flex-1 space-y-4 p-8 pt-6">
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-10 w-[300px]" />
+          <Skeleton className="h-10 w-[120px]" />
+        </div>
+
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-6 w-[200px] mb-2" />
+            <Skeleton className="h-4 w-[300px]" />
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-[100px]" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+
+            <Skeleton className="h-24 w-full" />
+
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-[150px]" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-[150px]" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+
+            <div className="flex justify-end space-x-2">
+              <Skeleton className="h-10 w-[100px]" />
+              <Skeleton className="h-10 w-[150px]" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   // Calculate dashboard metrics
-  const totalRevenue = orders.reduce((sum, order) => sum + order.total, 0);
+  const totalRevenue = orders
+    .filter((order) => order.status === "DELIVERED")
+    .reduce((sum, order) => {
+      const orderTotal = order.items.reduce(
+        (orderSum, item) => orderSum + item.subtotal,
+        0
+      );
+      return sum + orderTotal;
+    }, 0);
   const totalOrders = orders.length;
   const totalProducts = products.length;
   // Count unique customers by email
@@ -51,16 +135,16 @@ export default function Dashboard() {
 
   // Calculate recent stats
   const pendingOrders = orders.filter(
-    (order) => order.status === "pending"
+    (order) => order.status === "PENDING"
   ).length;
   const processingOrders = orders.filter(
-    (order) => order.status === "processing"
+    (order) => order.status === "PROCESSING"
   ).length;
   const shippedOrders = orders.filter(
-    (order) => order.status === "shipped"
+    (order) => order.status === "SHIPPED"
   ).length;
   const deliveredOrders = orders.filter(
-    (order) => order.status === "delivered"
+    (order) => order.status === "DELIVERED"
   ).length;
 
   // Calculate low stock products (inventory < 10)
@@ -84,7 +168,7 @@ export default function Dashboard() {
     { name: "Delivered", value: deliveredOrders },
     {
       name: "Canceled",
-      value: orders.filter((order) => order.status === "canceled").length,
+      value: orders.filter((order) => order.status === "CANCELED").length,
     },
   ].filter((item) => item.value > 0);
 
@@ -116,7 +200,7 @@ export default function Dashboard() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₦{totalRevenue.toFixed(2)}</div>
+            <div className="text-2xl font-bold">₦{totalRevenue}</div>
             <div className="flex items-center pt-1">
               <ArrowUpIcon className="mr-1 h-3 w-3 text-green-500" />
               <span className="text-xs text-green-500 font-medium">+20.1%</span>
@@ -245,20 +329,25 @@ export default function Dashboard() {
                             {order.items.length === 1 ? "item" : "items"}
                           </span>
                           <span>•</span>
-                          <span>₦{order.total.toFixed(2)}</span>
+                          <span>
+                            ₦
+                            {order.items
+                              ?.reduce((sum, item) => sum + item.subtotal, 0)
+                              .toLocaleString()}
+                          </span>
                         </div>
                       </div>
                       <Badge
                         className={cn(
-                          order.status === "delivered" &&
+                          order.status === "DELIVERED" &&
                             "bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-900 dark:text-green-100",
-                          order.status === "shipped" &&
+                          order.status === "SHIPPED" &&
                             "bg-blue-100 text-blue-800 hover:bg-blue-100 dark:bg-blue-900 dark:text-blue-100",
-                          order.status === "processing" &&
+                          order.status === "PROCESSING" &&
                             "bg-amber-100 text-amber-800 hover:bg-amber-100 dark:bg-amber-900 dark:text-amber-100",
-                          order.status === "pending" &&
+                          order.status === "PENDING" &&
                             "bg-gray-100 text-gray-800 hover:bg-gray-100 dark:bg-gray-700 dark:text-gray-100",
-                          order.status === "canceled" &&
+                          order.status === "CANCELED" &&
                             "bg-red-100 text-red-800 hover:bg-red-100 dark:bg-red-900 dark:text-red-100"
                         )}
                         variant="outline"
