@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { useStore } from "@/store/store";
 import { Badge } from "@/components/ui/badge";
@@ -52,24 +52,48 @@ export default function OrdersPage() {
   const [confirmStatusOpen, setConfirmStatusOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [newStatus, setNewStatus] = useState<string>("");
+  const [loading, setLoading] = useState(true);
 
   // Filter orders based on search query and status filter
-  const filteredOrders = orders.filter((order) => {
-    const matchesSearch =
-      searchQuery === "" ||
-      order.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      `${order.customerDetails.firstName} ${order.customerDetails.lastName}`
-        .toLowerCase()
-        .includes(searchQuery.toLowerCase()) ||
-      order.customerDetails.email
-        .toLowerCase()
-        .includes(searchQuery.toLowerCase());
+  const filteredOrders = useMemo(() => {
+    return orders.filter((order) => {
+      const customer = order.customerDetails;
+      const matchesSearch =
+        searchQuery === "" ||
+        order.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (customer &&
+          `${customer.firstName} ${customer.lastName}`
+            .toLowerCase()
+            .includes(searchQuery.toLowerCase())) ||
+        (customer &&
+          customer.email.toLowerCase().includes(searchQuery.toLowerCase()));
 
-    const matchesStatus =
-      statusFilter === null || order.status === statusFilter;
+      const matchesStatus =
+        statusFilter === null || order.status === statusFilter;
 
-    return matchesSearch && matchesStatus;
-  });
+      return matchesSearch && matchesStatus;
+    });
+  }, [orders, searchQuery, statusFilter]);
+
+  useEffect(() => {
+    const orders = useStore.getState().orders;
+    if (!orders || orders.length === 0) {
+      useStore
+        .getState()
+        .fetchOrders()
+        .then(() => {
+          const updatedOrders = useStore.getState().orders;
+          console.log("[FETCHED_ORDERS]", updatedOrders);
+          setLoading(false);
+        });
+    } else {
+      setLoading(false);
+    }
+  }, []);
+
+  if (loading) {
+    return <div className="p-8 text-muted-foreground">Loading Orders...</div>;
+  }
 
   // Handle view order
   const handleViewOrder = (order: Order) => {
@@ -78,13 +102,66 @@ export default function OrdersPage() {
   };
 
   // Handle update order status
-  const handleUpdateStatus = (orderId: string, status: string) => {
-    updateOrderStatus(orderId, status);
-    setConfirmStatusOpen(false);
-    toast({
-      title: "Order Status Updated",
-      description: `Order #${orderId} status has been updated to ${status}`,
-    });
+  const handleUpdateStatus = async (orderId: string, newStatus: string) => {
+    const orderToUpdate = orders.find((o) => o.id === orderId);
+    if (!orderToUpdate) return;
+
+    const payload = {
+      firstName: orderToUpdate.customerDetails.firstName,
+      lastName: orderToUpdate.customerDetails.lastName,
+      email: orderToUpdate.customerDetails.email,
+      phone: orderToUpdate.customerDetails.phone,
+      address: orderToUpdate.address.address,
+      city: orderToUpdate.address.city,
+      state: orderToUpdate.address.state,
+      postalCode: orderToUpdate.address.postalCode,
+      country: orderToUpdate.address.country,
+      status: newStatus,
+      items: orderToUpdate.items.map((item) => ({
+        productId: item.productId,
+        quantity: item.quantity,
+      })),
+    };
+
+    try {
+      const res = await fetch(`/api/orders/${orderId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) throw new Error("Failed to update order");
+
+      toast({
+        title: "Order Status Updated",
+        description: `Order #${orderId} status has been updated to ${newStatus}`,
+      });
+
+      async function fetchOrders() {
+        try {
+          await useStore.getState().fetchOrders();
+        } catch (err) {
+          console.error("[FETCH_ORDERS]", err);
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: "Failed to fetch orders.",
+          });
+        }
+      }
+
+      // ✅ Refresh orders to reflect updated status
+      await fetchOrders();
+    } catch (err) {
+      console.error("[UPDATE_ORDER]", err);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to update order status.",
+      });
+    }
   };
 
   // Open confirm status modal
@@ -97,15 +174,15 @@ export default function OrdersPage() {
   // Get status badge color
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "pending":
+      case "PENDING":
         return "bg-yellow-500";
-      case "processing":
+      case "PROCESSING":
         return "bg-blue-500";
-      case "shipped":
+      case "SHIPPED":
         return "bg-purple-500";
-      case "delivered":
+      case "DELIVERED":
         return "bg-green-500";
-      case "canceled":
+      case "CANCELED":
         return "bg-red-500";
       default:
         return "bg-gray-500";
@@ -136,7 +213,7 @@ export default function OrdersPage() {
             <div className="relative w-64">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search orders..."
+                placeholder="Customer name or order ID..."
                 className="pl-8"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -158,19 +235,19 @@ export default function OrdersPage() {
                 <DropdownMenuItem onClick={() => setStatusFilter(null)}>
                   All Orders
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setStatusFilter("pending")}>
+                <DropdownMenuItem onClick={() => setStatusFilter("PENDING")}>
                   Pending
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setStatusFilter("processing")}>
+                <DropdownMenuItem onClick={() => setStatusFilter("PROCESSING")}>
                   Processing
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setStatusFilter("shipped")}>
+                <DropdownMenuItem onClick={() => setStatusFilter("SHIPPED")}>
                   Shipped
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setStatusFilter("delivered")}>
+                <DropdownMenuItem onClick={() => setStatusFilter("DELIVERED")}>
                   Delivered
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setStatusFilter("canceled")}>
+                <DropdownMenuItem onClick={() => setStatusFilter("CANCELED")}>
                   Canceled
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -204,15 +281,22 @@ export default function OrdersPage() {
                         {format(new Date(order.createdAt), "MMM d, yyyy")}
                       </TableCell>
                       <TableCell>
-                        {order.customerDetails.firstName}{" "}
-                        {order.customerDetails.lastName}
+                        {order.customerDetails
+                          ? `${order.customerDetails.firstName} ${order.customerDetails.lastName}`
+                          : "N/A"}
                       </TableCell>
+
                       <TableCell>
                         <Badge className={getStatusColor(order.status)}>
                           {order.status}
                         </Badge>
                       </TableCell>
-                      <TableCell>₦{order.total.toFixed(2)}</TableCell>
+                      <TableCell>
+                        ₦
+                        {order.items
+                          ?.reduce((sum, item) => sum + item.subtotal, 0)
+                          .toLocaleString()}
+                      </TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -228,7 +312,7 @@ export default function OrdersPage() {
                               View Details
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuLabel>Update Status</DropdownMenuLabel>
+                            {/* <DropdownMenuLabel>Update Status</DropdownMenuLabel>
                             <DropdownMenuItem
                               onClick={() =>
                                 openConfirmStatus(order, "pending")
@@ -268,7 +352,7 @@ export default function OrdersPage() {
                               disabled={order.status === "canceled"}
                             >
                               Mark as Canceled
-                            </DropdownMenuItem>
+                            </DropdownMenuItem> */}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -302,16 +386,6 @@ export default function OrdersPage() {
           onUpdateStatus={(orderId, status) =>
             handleUpdateStatus(orderId, status)
           }
-        />
-      )}
-
-      {/* Confirm Status Modal */}
-      {selectedOrder && (
-        <ConfirmStatusModal
-          open={confirmStatusOpen}
-          onOpenChange={setConfirmStatusOpen}
-          onConfirm={() => handleUpdateStatus(selectedOrder.id, newStatus)}
-          statusToUpdate={newStatus}
         />
       )}
     </div>

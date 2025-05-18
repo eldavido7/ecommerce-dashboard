@@ -53,11 +53,19 @@ export default function ProductsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchProducts();
-  }, []);
-
-  useEffect(() => {
-    fetchProducts().finally(() => setLoading(false));
+    const products = useStore.getState().products;
+    if (!products || products.length === 0) {
+      useStore
+        .getState()
+        .fetchProducts()
+        .then(() => {
+          const updatedProducts = useStore.getState().products;
+          console.log("[FETCHED_PRODUCTS]", updatedProducts);
+          setLoading(false);
+        });
+    } else {
+      setLoading(false);
+    }
   }, []);
 
   if (loading) {

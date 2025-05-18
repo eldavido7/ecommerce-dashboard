@@ -8,14 +8,50 @@ datasource db {
 }
 
 model Product {
-  id        String   @id @default(uuid())           // Nano ID will be generated in code
+  id          String      @id @default(uuid()) // Nano ID will be generated in code
   title       String
   description String
-  price       Int                   // Naira in full units (e.g., 1500 = ₦1500)
+  price       Int // Naira in full units (e.g., 1500 = ₦1500)
   inventory   Int
   category    String
   tags        String[]
-  barcode     String   @unique
-  createdAt   DateTime @default(now())
-  updatedAt DateTime @updatedAt @default(now())
+  barcode     String      @unique
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @default(now()) @updatedAt
+  orderItems  OrderItem[]
+  quantity    Int         @default(0) // 🆕 inventory stock
+}
+
+enum OrderStatus {
+  PENDING
+  PROCESSING
+  SHIPPED
+  DELIVERED
+}
+
+model Order {
+  id              String       @id @default(uuid())
+  firstName       String
+  lastName        String
+  email           String
+  phone           String
+  address         String
+  city            String
+  state           String
+  postalCode      String
+  country         String
+  status          OrderStatus  @default(PENDING) // 🆕
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @default(now()) @updatedAt
+  items           OrderItem[]
+}
+
+model OrderItem {
+  id        String   @id @default(uuid())
+  order     Order    @relation(fields: [orderId], references: [id])
+  orderId   String
+  product   Product  @relation(fields: [productId], references: [id])
+  productId String
+  quantity  Int
+  subtotal  Float    // 🆕 calculated per item
 }

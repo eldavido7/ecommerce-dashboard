@@ -1,8 +1,6 @@
 "use client";
 
-import type React from "react";
-
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,29 +20,30 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/use-toast";
-import { AlertCircle, Plus, Search } from "lucide-react";
-import type {
-  Order,
-  OrderItem,
-  CustomerDetails,
-  Address,
-  Product,
-} from "@/types";
+import { AlertCircle, Plus } from "lucide-react";
+import type { CustomerDetails, Address, Order } from "@/types";
 import { useStore } from "@/store/store";
+import { useShallow } from "zustand/react/shallow";
 
 interface CreateOrderModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onAddOrder: (order: Order) => void;
+  onAddOrder: (
+    order: Omit<Order, "id" | "createdAt" | "updatedAt">
+  ) => Promise<void>;
 }
 
 export function CreateOrderModal({
   open,
   onOpenChange,
-  onAddOrder,
 }: CreateOrderModalProps) {
-  // Get products directly from the store
-  const products = useStore((state) => state.products);
+  const { products, onAddOrder, fetchOrders } = useStore(
+    useShallow((state) => ({
+      products: state.products,
+      onAddOrder: state.addOrder,
+      fetchOrders: state.fetchOrders,
+    }))
+  );
 
   const [customerDetails, setCustomerDetails] = useState<CustomerDetails>({
     firstName: "",
@@ -54,56 +53,30 @@ export function CreateOrderModal({
   });
 
   const [shippingAddress, setShippingAddress] = useState<Address>({
-    firstName: "",
-    lastName: "",
-    address1: "",
+    address: "",
     city: "",
-    province: "",
+    state: "",
     postalCode: "",
     country: "Nigeria",
   });
 
   const [selectedItems, setSelectedItems] = useState<
-    {
-      productId: string;
-      variantId: string;
-      quantity: number;
-    }[]
+    { productId: string; quantity: number }[]
   >([]);
 
-  // State for product search
-  const [activeSearchIndex, setActiveSearchIndex] = useState<number | null>(
-    null
-  );
-  const [searchTerm, setSearchTerm] = useState("");
-  const [searchSuggestions, setSearchSuggestions] = useState<Product[]>([]);
-  const searchInputRef = useRef<HTMLInputElement>(null);
-
-  // Debug: Log products to ensure they're loaded
-  useEffect(() => {
-    console.log("Products from store:", products);
-  }, [products]);
-
-  // Add item to new order
+  // Add item to order
   const addItemToOrder = () => {
-    setSelectedItems([
-      ...selectedItems,
-      {
-        productId: "",
-        variantId: "",
-        quantity: 1,
-      },
-    ]);
+    setSelectedItems([...selectedItems, { productId: "", quantity: 1 }]);
   };
 
-  // Remove item from new order
+  // Remove item from order
   const removeItemFromOrder = (index: number) => {
     const newItems = [...selectedItems];
     newItems.splice(index, 1);
     setSelectedItems(newItems);
   };
 
-  // Update item in new order
+  // Update item in order
   const updateOrderItem = (
     index: number,
     field: string,
@@ -111,58 +84,11 @@ export function CreateOrderModal({
   ) => {
     const newItems = [...selectedItems];
     newItems[index] = { ...newItems[index], [field]: value };
-
-    // If product changed, reset variant
-    if (field === "productId") {
-      newItems[index].variantId = "";
-    }
-
     setSelectedItems(newItems);
   };
 
-  // Handle search input change
-  const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const term = e.target.value;
-    setSearchTerm(term);
-
-    if (term.length >= 2) {
-      // Filter products based on search term
-      const suggestions = products
-        .filter((product) => {
-          const titleMatch = product.title
-            .toLowerCase()
-            .includes(term.toLowerCase());
-          const categoryMatch = product.category
-            .toLowerCase()
-            .includes(term.toLowerCase());
-          const tagsMatch = product.tags.some((tag) =>
-            tag.toLowerCase().includes(term.toLowerCase())
-          );
-
-          return (
-            (titleMatch || categoryMatch || tagsMatch) && product.inventory > 0
-          );
-        })
-        .slice(0, 5); // Limit to 5 suggestions
-
-      setSearchSuggestions(suggestions);
-    } else {
-      setSearchSuggestions([]);
-    }
-  };
-
-  // Handle product selection from suggestions
-  const handleProductSelect = (product: Product) => {
-    if (activeSearchIndex === null) return;
-
-    updateOrderItem(activeSearchIndex, "productId", product.id);
-    setSearchTerm("");
-    setSearchSuggestions([]);
-    setActiveSearchIndex(null);
-  };
-
-  // Create new order
-  const handleCreateOrder = () => {
+  // Create order
+  const handleCreateOrder = async () => {
     // Validate customer details
     if (
       !customerDetails.firstName ||
@@ -180,9 +106,9 @@ export function CreateOrderModal({
 
     // Validate shipping address
     if (
-      !shippingAddress.address1 ||
+      !shippingAddress.address ||
       !shippingAddress.city ||
-      !shippingAddress.province ||
+      !shippingAddress.state ||
       !shippingAddress.postalCode
     ) {
       toast({
@@ -194,108 +120,62 @@ export function CreateOrderModal({
     }
 
     // Validate items
-    if (selectedItems.length === 0) {
+    if (
+      selectedItems.length === 0 ||
+      selectedItems.some((item) => !item.productId)
+    ) {
       toast({
-        title: "No Items Selected",
-        description: "Please add at least one product to the order",
+        title: "Invalid Order Items",
+        description: "Please add at least one valid product to the order",
         variant: "destructive",
       });
       return;
     }
 
-    // Create order items
-    const orderItems: OrderItem[] = [];
-    let subtotal = 0;
+    // Prepare order items
+    const items = selectedItems.map((item) => ({
+      productId: item.productId,
+      quantity: item.quantity,
+    }));
 
-    for (const item of selectedItems) {
-      const product = products.find((p) => p.id === item.productId);
-      if (!product) continue;
-
-      const variant = product.variants.find((v) => v.id === item.variantId);
-      if (!variant) continue;
-
-      const orderItem: OrderItem = {
-        id: `item_${Math.random().toString(36).substring(2, 10)}`,
-        title: `${product.title} - ${variant.title}`,
-        quantity: item.quantity,
-        unitPrice: variant.price,
-        thumbnail: product.thumbnail,
-        variant: {
-          id: variant.id,
-          title: variant.title,
-        },
-      };
-
-      orderItems.push(orderItem);
-      subtotal += variant.price * item.quantity;
-    }
-
-    if (orderItems.length === 0) {
-      toast({
-        title: "Error",
-        description: "Please select valid products and variants",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Calculate totals
-    const shippingTotal = 1500.0; // Default shipping
-    const total = subtotal + shippingTotal;
-
-    // Create new order
-    const newOrder: Order = {
-      id: `order_${Math.random().toString(36).substring(2, 10)}`,
-      customerDetails: customerDetails,
-      items: orderItems,
-      status: "pending",
-      paymentStatus: "awaiting",
-      fulfillmentStatus: "not_fulfilled",
-      total: total,
-      subtotal: subtotal,
-      shippingTotal: shippingTotal,
-      discountTotal: 0,
-      taxTotal: 0,
-      shippingAddress: {
-        ...shippingAddress,
-        firstName: customerDetails.firstName,
-        lastName: customerDetails.lastName,
-      },
-      billingAddress: {
-        ...shippingAddress,
-        firstName: customerDetails.firstName,
-        lastName: customerDetails.lastName,
-      },
-      createdAt: new Date(),
-      updatedAt: new Date(),
+    // Prepare order data for backend
+    const orderData = {
+      firstName: customerDetails.firstName,
+      lastName: customerDetails.lastName,
+      email: customerDetails.email,
+      phone: customerDetails.phone,
+      address: shippingAddress.address,
+      city: shippingAddress.city,
+      state: shippingAddress.state,
+      postalCode: shippingAddress.postalCode,
+      country: shippingAddress.country,
+      items,
     };
 
-    // Add order to store
-    onAddOrder(newOrder);
-
-    // Reset form
-    setCustomerDetails({
-      firstName: "",
-      lastName: "",
-      email: "",
-      phone: "",
-    });
-    setShippingAddress({
-      firstName: "",
-      lastName: "",
-      address1: "",
-      city: "",
-      province: "",
-      postalCode: "",
-      country: "Nigeria",
-    });
-    setSelectedItems([]);
-    onOpenChange(false);
-
-    toast({
-      title: "Order Created",
-      description: `Order #${newOrder.id} has been created successfully`,
-    });
+    try {
+      await onAddOrder(orderData);
+      await fetchOrders(); // 👈 Fetch the latest orders after adding
+      setCustomerDetails({ firstName: "", lastName: "", email: "", phone: "" });
+      setShippingAddress({
+        address: "",
+        city: "",
+        state: "",
+        postalCode: "",
+        country: "Nigeria",
+      });
+      setSelectedItems([]);
+      onOpenChange(false);
+      toast({
+        title: "Order Created",
+        description: "Order has been created successfully",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to create order. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -379,14 +259,14 @@ export function CreateOrderModal({
             <h3 className="text-lg font-medium">Shipping Address</h3>
             <div className="grid gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="address1">Address</Label>
+                <Label htmlFor="address">Address</Label>
                 <Input
-                  id="address1"
-                  value={shippingAddress.address1}
+                  id="address"
+                  value={shippingAddress.address}
                   onChange={(e) =>
                     setShippingAddress({
                       ...shippingAddress,
-                      address1: e.target.value,
+                      address: e.target.value,
                     })
                   }
                   required
@@ -408,14 +288,14 @@ export function CreateOrderModal({
                   />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="province">State/Province</Label>
+                  <Label htmlFor="state">State</Label>
                   <Input
-                    id="province"
-                    value={shippingAddress.province}
+                    id="state"
+                    value={shippingAddress.state}
                     onChange={(e) =>
                       setShippingAddress({
                         ...shippingAddress,
-                        province: e.target.value,
+                        state: e.target.value,
                       })
                     }
                     required
@@ -480,98 +360,31 @@ export function CreateOrderModal({
                     <div className="grid grid-cols-2 gap-4">
                       <div className="grid gap-2">
                         <Label>Product</Label>
-                        <div className="relative">
-                          {activeSearchIndex === index ? (
-                            <>
-                              <div className="flex items-center relative">
-                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                                <Input
-                                  ref={searchInputRef}
-                                  type="search"
-                                  placeholder="Search by title, category, or tags..."
-                                  className="pl-8"
-                                  value={searchTerm}
-                                  onChange={handleSearchInputChange}
-                                  autoFocus
-                                />
-                              </div>
-                              {searchSuggestions.length > 0 && (
-                                <div className="absolute z-10 w-full mt-1 bg-white border rounded-md shadow-lg max-h-60 overflow-auto">
-                                  {searchSuggestions.map((product) => (
-                                    <div
-                                      key={product.id}
-                                      className="px-4 py-2 hover:bg-white cursor-pointer"
-                                      onClick={() =>
-                                        handleProductSelect(product)
-                                      }
-                                    >
-                                      <div className="font-medium">
-                                        {product.title}
-                                      </div>
-                                      <div className="text-sm text-muted-foreground">
-                                        {product.category} • {product.inventory}{" "}
-                                        in stock
-                                        {product.tags &&
-                                          product.tags.length > 0 &&
-                                          ` • ${product.tags.join(", ")}`}
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </>
-                          ) : (
-                            <Button
-                              variant="outline"
-                              className="w-full justify-between"
-                              onClick={() => {
-                                setActiveSearchIndex(index);
-                                setSearchTerm("");
-                                setSearchSuggestions([]);
-                                // Focus the search input after a short delay to ensure it's rendered
-                                setTimeout(() => {
-                                  searchInputRef.current?.focus();
-                                }, 10);
-                              }}
-                            >
-                              {item.productId
-                                ? products.find(
-                                    (product) => product.id === item.productId
-                                  )?.title || "Select product"
-                                : "Search products..."}
-                              <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="grid gap-2">
-                        <Label>Variant</Label>
-                        <Select
-                          value={item.variantId}
-                          onValueChange={(value) =>
-                            updateOrderItem(index, "variantId", value)
-                          }
-                          disabled={!item.productId}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select variant" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {item.productId &&
-                              products
-                                .find((p) => p.id === item.productId)
-                                ?.variants.map((variant) => (
-                                  <SelectItem
-                                    key={variant.id}
-                                    value={variant.id}
-                                  >
-                                    {variant.title} - ₦
-                                    {variant.price.toFixed(2)}
-                                  </SelectItem>
-                                ))}
-                          </SelectContent>
-                        </Select>
+                        {products && products.length > 0 ? (
+                          <Select
+                            onValueChange={(value) =>
+                              updateOrderItem(index, "productId", value)
+                            }
+                            defaultValue={item.productId}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select a product" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {products.map((product) => (
+                                <SelectItem key={product.id} value={product.id}>
+                                  {product.title} - ₦{product.price.toFixed(2)}{" "}
+                                  ({product.inventory} in stock)
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <div className="text-sm text-muted-foreground">
+                            No products available. Please add products to the
+                            inventory first.
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -602,20 +415,17 @@ export function CreateOrderModal({
                       </Button>
                     </div>
 
-                    {item.productId && item.variantId && (
+                    {item.productId && (
                       <div className="text-sm text-muted-foreground">
                         {(() => {
                           const product = products.find(
                             (p) => p.id === item.productId
                           );
-                          const variant = product?.variants.find(
-                            (v) => v.id === item.variantId
-                          );
-                          if (product && variant) {
-                            const total = variant.price * item.quantity;
+                          if (product) {
+                            const total = product.price * item.quantity;
                             return `${item.quantity} × ${
-                              variant.title
-                            } at ₦${variant.price.toFixed(
+                              product.title
+                            } at ₦${product.price.toFixed(
                               2
                             )} = ₦${total.toFixed(2)}`;
                           }
@@ -633,11 +443,8 @@ export function CreateOrderModal({
                       const product = products.find(
                         (p) => p.id === item.productId
                       );
-                      const variant = product?.variants.find(
-                        (v) => v.id === item.variantId
-                      );
                       return (
-                        sum + (variant ? variant.price * item.quantity : 0)
+                        sum + (product ? product.price * item.quantity : 0)
                       );
                     }, 0)
                     .toFixed(2)}

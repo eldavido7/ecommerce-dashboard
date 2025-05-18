@@ -44,7 +44,7 @@ export function AddProductModal({
     barcode: "",
   });
 
-  const handleAddProduct = () => {
+  const handleAddProduct = async () => {
     const productData = {
       title: productForm.title,
       description: productForm.description,
@@ -55,14 +55,21 @@ export function AddProductModal({
       barcode: productForm.barcode || "",
     };
 
-    onAddProduct(productData); // no id, no dates
-    onOpenChange(false);
-    resetForm();
-
-    toast({
-      title: "Product Added",
-      description: `${productForm.title} has been added successfully.`,
-    });
+    try {
+      await onAddProduct(productData); // Wait for the request to complete
+      onOpenChange(false);
+      resetForm();
+      toast({
+        title: "Product Added",
+        description: `${productForm.title} has been added successfully.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to add product. Please try again.",
+        variant: "destructive", // Optional: Use a different toast style for errors
+      });
+    }
   };
 
   const resetForm = () => {

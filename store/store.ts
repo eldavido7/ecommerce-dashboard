@@ -11,10 +11,11 @@ interface StoreState {
   deleteProduct: (id: string) => Promise<void>;
 
   // Orders
-  orders: Order[]
-  updateOrderStatus: (id: string, status: string) => void
-  addOrder: (order: Order) => void
-  deleteOrder: (id: string) => void
+  orders: Order[];
+  fetchOrders: () => Promise<void>;
+  addOrder: (order: Omit<Order, "id" | "createdAt" | "updatedAt">) => Promise<void>;
+  updateOrderStatus: (id: string, status: Order["status"]) => void;
+  deleteOrder: (id: string) => Promise<void>;
 
   // Discounts
   discounts: Discount[]
@@ -81,21 +82,78 @@ export const useStore = create<StoreState>((set) => ({
   },
 
   // Orders
-  orders: mockOrders,
-  updateOrderStatus: (id, status) =>
+  orders: [],
+
+  fetchOrders: async () => {
+    try {
+      const res = await fetch("/api/orders");
+      if (!res.ok) throw new Error("Failed to fetch orders");
+      const rawOrders = await res.json();
+
+      const ordersWithItems = await Promise.all(
+        rawOrders.map(async (order: any) => {
+          const itemsRes = await fetch(`/api/orders/${order.id}`);
+          const orderItems = itemsRes.ok ? await itemsRes.json() : [];
+
+          return {
+            id: order.id,
+            createdAt: order.createdAt,
+            status: order.status,
+            customerDetails: {
+              firstName: order.firstName,
+              lastName: order.lastName,
+              email: order.email,
+              phone: order.phone,
+            },
+            address: {
+              city: order.city,
+              state: order.state,
+              postalCode: order.postalCode,
+              country: order.country,
+            },
+            items: orderItems.items ?? [], // ✅ get only the nested items array
+          };
+        })
+      );
+
+      set({ orders: ordersWithItems });
+    } catch (error) {
+      console.error("[FETCH_ORDERS]", error);
+    }
+  },
+
+  addOrder: async (order) => {
+    const res = await fetch("/api/orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(order),
+    });
+
+    if (!res.ok) throw new Error("Failed to create order");
+    const newOrder = await res.json();
+    set((state) => ({ orders: [newOrder, ...state.orders] }));
+  },
+
+  updateOrderStatus: async (id, status) => {
+    await fetch(`/api/orders/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+
     set((state) => ({
-      orders: state.orders.map((order) =>
-        order.id === id ? { ...order, status: status as Order["status"] } : order
+      orders: state.orders.map((o) =>
+        o.id === id ? { ...o, status } : o
       ),
-    })),
-  addOrder: (order) =>
+    }));
+  },
+
+  deleteOrder: async (id) => {
+    await fetch(`/api/orders/${id}`, { method: "DELETE" });
     set((state) => ({
-      orders: [order, ...state.orders],
-    })),
-  deleteOrder: (id) =>
-    set((state) => ({
-      orders: state.orders.filter((order) => order.id !== id),
-    })),
+      orders: state.orders.filter((o) => o.id !== id),
+    }));
+  },
 
   // Discounts
   discounts: mockDiscounts,

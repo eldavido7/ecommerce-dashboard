@@ -13,54 +13,41 @@ export interface Product {
 }
 
 // Order Types
-export interface Order {
-  id: string
-  customerDetails: CustomerDetails
-  items: OrderItem[]
-  status: "pending" | "processing" | "shipped" | "delivered" | "canceled"
-  paymentStatus: "awaiting" | "captured" | "refunded" | "canceled"
-  fulfillmentStatus: "not_fulfilled" | "fulfilled" | "shipped" | "canceled"
-  total: number
-  subtotal: number
-  shippingTotal: number
-  discountTotal: number
-  taxTotal: number
-  shippingAddress: Address
-  billingAddress: Address
-  createdAt: Date
-  updatedAt: Date
+export interface Address {
+  address: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  country: string;
+}
+
+export interface CustomerDetails {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
 }
 
 export interface OrderItem {
-  id: string
-  title: string
-  quantity: number
-  unitPrice: number
-  thumbnail: string
-  variant: {
-    id: string
-    title: string
-  }
+  product: any
+  id: string;
+  productId: string;
+  quantity: number;
+  subtotal: number;
+  orderId: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
-// Customer Details (embedded in Order)
-export interface CustomerDetails {
-  email: string
-  firstName: string
-  lastName: string
-  phone: string
-}
-
-export interface Address {
-  firstName: string
-  lastName: string
-  address1: string
-  address2?: string
-  city: string
-  province: string
-  postalCode: string
-  country: string
-  phone?: string
+export interface Order {
+  id: string;
+  customerDetails: CustomerDetails;
+  items: OrderItem[];
+  status: "pending" | "processing" | "shipped" | "delivered" | "canceled";
+  total: number;
+  createdAt: Date;
+  updatedAt: Date;
+  address: Address;
 }
 
 // Discount Types
