@@ -33,7 +33,7 @@ import {
 import { toast } from "@/components/ui/use-toast";
 import { CreateOrderModal } from "./components/create-order-modal";
 import { ViewOrderModal } from "./components/view-order-modal";
-import { ConfirmStatusModal } from "./components/confirm-status-modal";
+import { EditOrderModal } from "./components/edit-order-modal";
 import {
   ChevronDown,
   Filter,
@@ -45,10 +45,11 @@ import type { Order } from "@/types";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function OrdersPage() {
-  const { orders, updateOrderStatus, addOrder, deleteOrder } = useStore();
+  const { orders, addOrder, updateOrder } = useStore();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [createOrderOpen, setCreateOrderOpen] = useState(false);
+  const [editOrderOpen, setEditOrderOpen] = useState(false);
   const [viewOrderOpen, setViewOrderOpen] = useState(false);
   const [confirmStatusOpen, setConfirmStatusOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -137,6 +138,12 @@ export default function OrdersPage() {
   const handleViewOrder = (order: Order) => {
     setSelectedOrder(order);
     setViewOrderOpen(true);
+  };
+
+  // Handle edit order
+  const handleEditOrder = (order: Order) => {
+    setSelectedOrder(order);
+    setEditOrderOpen(true);
   };
 
   // Handle update order status
@@ -350,47 +357,12 @@ export default function OrdersPage() {
                               View Details
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            {/* <DropdownMenuLabel>Update Status</DropdownMenuLabel>
                             <DropdownMenuItem
-                              onClick={() =>
-                                openConfirmStatus(order, "pending")
-                              }
-                              disabled={order.status === "pending"}
+                              onClick={() => handleEditOrder(order)}
+                              disabled={order.status === "DELIVERED"} // Disable if status is DELIVERED
                             >
-                              Mark as Pending
+                              Edit Order
                             </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() =>
-                                openConfirmStatus(order, "processing")
-                              }
-                              disabled={order.status === "processing"}
-                            >
-                              Mark as Processing
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() =>
-                                openConfirmStatus(order, "shipped")
-                              }
-                              disabled={order.status === "shipped"}
-                            >
-                              Mark as Shipped
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() =>
-                                openConfirmStatus(order, "delivered")
-                              }
-                              disabled={order.status === "delivered"}
-                            >
-                              Mark as Delivered
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() =>
-                                openConfirmStatus(order, "canceled")
-                              }
-                              disabled={order.status === "canceled"}
-                            >
-                              Mark as Canceled
-                            </DropdownMenuItem> */}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -414,6 +386,16 @@ export default function OrdersPage() {
         onOpenChange={setCreateOrderOpen}
         onAddOrder={addOrder}
       />
+
+      {/* Edit Order Modal */}
+      {selectedOrder && (
+        <EditOrderModal
+          open={editOrderOpen}
+          onOpenChange={setEditOrderOpen}
+          order={selectedOrder}
+          onUpdateOrder={updateOrder}
+        />
+      )}
 
       {/* View Order Modal */}
       {selectedOrder && (

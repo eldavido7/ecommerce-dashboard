@@ -1,12 +1,12 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Switch } from "@/components/ui/switch"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useState, useEffect, useMemo } from "react";
+import { useStore } from "@/store/store";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -14,107 +14,139 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { toast } from "@/components/ui/use-toast"
-import type { Discount } from "@/types"
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { X } from "lucide-react";
+import type { Discount } from "@/types";
 
 interface EditDiscountModalProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  discount: Discount | null
-  onUpdateDiscount: (id: string, discount: Partial<Discount>) => void
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  discount: Discount | null;
+  onUpdateDiscount: (updated: Discount) => void;
 }
 
-export function EditDiscountModal({ open, onOpenChange, discount, onUpdateDiscount }: EditDiscountModalProps) {
-  const [discountForm, setDiscountForm] = useState<Partial<Discount>>({
-    code: "",
-    description: "",
-    type: "percentage",
-    value: 0,
-    usageLimit: undefined,
-    startsAt: new Date(),
-    endsAt: undefined,
-    isActive: true,
-    conditions: {
-      minSubtotal: 0,
-    },
-  })
+export function EditDiscountModal({
+  open,
+  onOpenChange,
+  discount,
+  onUpdateDiscount,
+}: EditDiscountModalProps) {
+  const { products } = useStore();
+  const [productSearch, setProductSearch] = useState("");
+  const [editDiscount, setEditDiscount] = useState<Discount | null>(null);
 
   useEffect(() => {
     if (discount) {
-      setDiscountForm({
-        code: discount.code,
-        description: discount.description || "",
-        type: discount.type,
-        value: discount.value,
-        usageLimit: discount.usageLimit,
-        startsAt: discount.startsAt,
-        endsAt: discount.endsAt,
-        isActive: discount.isActive,
-        conditions: {
-          minSubtotal: discount.conditions?.minSubtotal || 0,
-        },
-      })
+      setEditDiscount({ ...discount });
     }
-  }, [discount])
+  }, [discount]);
 
-  const saveDiscountChanges = () => {
-    if (!discount) return
-
-    onUpdateDiscount(discount.id, {
-      ...discountForm,
+  const handleSaveChanges = () => {
+    if (!editDiscount) return;
+    const updatedDiscount: Discount = {
+      ...editDiscount,
       updatedAt: new Date(),
-    })
+    };
+    onUpdateDiscount(updatedDiscount);
+    onOpenChange(false);
+    setEditDiscount(null);
+    setProductSearch("");
+  };
 
-    onOpenChange(false)
-    toast({
-      title: "Discount Updated",
-      description: `Discount code ${discountForm.code} has been updated.`,
-    })
-  }
+  const filteredProducts = useMemo(() => {
+    if (productSearch.length < 2) return [];
+    return products.filter(
+      (p) =>
+        p.title.toLowerCase().includes(productSearch.toLowerCase()) ||
+        p.id.toLowerCase().includes(productSearch.toLowerCase())
+    );
+  }, [productSearch, products]);
+
+  const addProductToConditions = (productId: string) => {
+    if (
+      editDiscount &&
+      !editDiscount.conditions?.products?.includes(productId)
+    ) {
+      setEditDiscount({
+        ...editDiscount,
+        conditions: {
+          ...editDiscount.conditions!,
+          products: [...(editDiscount.conditions?.products || []), productId],
+        },
+      });
+    }
+  };
+
+  const removeProductFromConditions = (productId: string) => {
+    if (!editDiscount) return;
+    setEditDiscount({
+      ...editDiscount,
+      conditions: {
+        ...editDiscount.conditions!,
+        products:
+          editDiscount.conditions?.products?.filter((id) => id !== productId) ||
+          [],
+      },
+    });
+  };
+
+  if (!editDiscount) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit Discount</DialogTitle>
-          <DialogDescription>Update the discount details.</DialogDescription>
+          <DialogDescription>Update discount code details.</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
+          {/* Fields reused from AddDiscountModal */}
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="edit-code" className="text-right">
-              Code
-            </Label>
+            <Label className="text-right">Code</Label>
             <Input
-              id="edit-code"
-              value={discountForm.code}
-              onChange={(e) => setDiscountForm({ ...discountForm, code: e.target.value.toUpperCase() })}
+              value={editDiscount.code}
+              onChange={(e) =>
+                setEditDiscount({
+                  ...editDiscount,
+                  code: e.target.value.toUpperCase(),
+                })
+              }
               className="col-span-3"
             />
           </div>
+
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="edit-description" className="text-right">
-              Description
-            </Label>
+            <Label className="text-right">Description</Label>
             <Textarea
-              id="edit-description"
-              value={discountForm.description}
-              onChange={(e) => setDiscountForm({ ...discountForm, description: e.target.value })}
+              value={editDiscount.description || ""}
+              onChange={(e) =>
+                setEditDiscount({
+                  ...editDiscount,
+                  description: e.target.value,
+                })
+              }
               className="col-span-3"
             />
           </div>
+
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="edit-type" className="text-right">
-              Type
-            </Label>
+            <Label className="text-right">Type</Label>
             <Select
-              value={discountForm.type}
-              onValueChange={(value: "percentage" | "fixed_amount" | "free_shipping") =>
-                setDiscountForm({ ...discountForm, type: value })
+              value={editDiscount.type}
+              onValueChange={(value) =>
+                setEditDiscount({ ...editDiscount, type: value as any })
               }
             >
               <SelectTrigger className="col-span-3">
-                <SelectValue placeholder="Select discount type" />
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="percentage">Percentage</SelectItem>
@@ -123,73 +155,156 @@ export function EditDiscountModal({ open, onOpenChange, discount, onUpdateDiscou
               </SelectContent>
             </Select>
           </div>
+
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="edit-value" className="text-right">
-              Value
-            </Label>
+            <Label className="text-right">Value</Label>
             <Input
-              id="edit-value"
               type="number"
-              value={discountForm.value}
-              onChange={(e) => setDiscountForm({ ...discountForm, value: Number.parseFloat(e.target.value) })}
+              value={editDiscount.value}
+              onChange={(e) =>
+                setEditDiscount({
+                  ...editDiscount,
+                  value: parseFloat(e.target.value),
+                })
+              }
               className="col-span-3"
             />
           </div>
+
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="edit-minSubtotal" className="text-right">
-              Min. Subtotal
-            </Label>
+            <Label className="text-right">Start Date</Label>
             <Input
-              id="edit-minSubtotal"
-              type="number"
-              value={discountForm.conditions?.minSubtotal}
+              type="datetime-local"
+              value={
+                editDiscount.startsAt
+                  ? new Date(editDiscount.startsAt).toISOString().slice(0, 16)
+                  : ""
+              }
               onChange={(e) =>
-                setDiscountForm({
-                  ...discountForm,
+                setEditDiscount({
+                  ...editDiscount,
+                  startsAt: new Date(e.target.value),
+                })
+              }
+              className="col-span-3"
+            />
+          </div>
+
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label className="text-right">End Date</Label>
+            <Input
+              type="datetime-local"
+              value={
+                editDiscount.endsAt
+                  ? new Date(editDiscount.endsAt).toISOString().slice(0, 16)
+                  : ""
+              }
+              onChange={(e) =>
+                setEditDiscount({
+                  ...editDiscount,
+                  endsAt: new Date(e.target.value),
+                })
+              }
+              className="col-span-3"
+            />
+          </div>
+
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label className="text-right">Min. Subtotal</Label>
+            <Input
+              type="number"
+              value={editDiscount.conditions?.minSubtotal || 0}
+              onChange={(e) =>
+                setEditDiscount({
+                  ...editDiscount,
                   conditions: {
-                    ...discountForm.conditions,
-                    minSubtotal: Number.parseFloat(e.target.value),
+                    ...editDiscount.conditions!,
+                    minSubtotal: parseFloat(e.target.value),
                   },
                 })
               }
               className="col-span-3"
             />
           </div>
+
+          {/* Product Filter */}
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="edit-usageLimit" className="text-right">
-              Usage Limit
-            </Label>
+            <Label className="text-right">Applies to</Label>
+            <div className="col-span-3 space-y-2">
+              <Input
+                value={productSearch}
+                onChange={(e) => setProductSearch(e.target.value)}
+                placeholder="Search by product name or ID"
+              />
+              {filteredProducts.length > 0 && (
+                <div className="border rounded p-2 max-h-[150px] overflow-y-auto space-y-1">
+                  {filteredProducts.map((product) => (
+                    <div
+                      key={product.id}
+                      className="cursor-pointer hover:bg-muted p-1 rounded text-sm"
+                      onClick={() => addProductToConditions(product.id)}
+                    >
+                      {product.title} ({product.id})
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="flex flex-wrap gap-2">
+                {editDiscount.conditions?.products?.map((productId) => {
+                  const product = products.find((p) => p.id === productId);
+                  return (
+                    <Badge key={productId} variant="secondary">
+                      {product?.title || productId}
+                      <X
+                        className="ml-1 h-3 w-3 cursor-pointer"
+                        onClick={() => removeProductFromConditions(productId)}
+                      />
+                    </Badge>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label className="text-right">Usage Limit</Label>
             <Input
-              id="edit-usageLimit"
               type="number"
-              value={discountForm.usageLimit}
+              value={editDiscount.usageLimit ?? ""}
               onChange={(e) =>
-                setDiscountForm({
-                  ...discountForm,
-                  usageLimit: e.target.value ? Number.parseInt(e.target.value) : undefined,
+                setEditDiscount({
+                  ...editDiscount,
+                  usageLimit: e.target.value
+                    ? parseInt(e.target.value)
+                    : undefined,
                 })
               }
               className="col-span-3"
+              placeholder="Unlimited"
             />
           </div>
+
           <div className="grid grid-cols-4 items-center gap-4">
             <Label className="text-right">Active</Label>
             <div className="flex items-center space-x-2 col-span-3">
               <Switch
-                checked={discountForm.isActive}
-                onCheckedChange={(checked) => setDiscountForm({ ...discountForm, isActive: checked })}
+                checked={editDiscount.isActive}
+                onCheckedChange={(checked) =>
+                  setEditDiscount({ ...editDiscount, isActive: checked })
+                }
               />
-              <Label>{discountForm.isActive ? "Active" : "Inactive"}</Label>
+              <Label>{editDiscount.isActive ? "Active" : "Inactive"}</Label>
             </div>
           </div>
         </div>
+
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={saveDiscountChanges}>Save Changes</Button>
+          <Button onClick={handleSaveChanges}>Save Changes</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

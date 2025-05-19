@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useStore } from "@/store/store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,28 +34,96 @@ import { format } from "date-fns";
 import { AddDiscountModal } from "./components/add-discount-modal";
 import { EditDiscountModal } from "./components/edit-discount-modal";
 import { DeleteDiscountModal } from "./components/delete-discount-modal";
-import { AddGiftCardModal } from "./components/add-gift-card-modal";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Card } from "@tremor/react";
+import { CardContent, CardHeader } from "@/components/ui/card";
+import { useShallow } from "zustand/react/shallow";
+import { toast } from "@/components/ui/use-toast";
+import { de } from "date-fns/locale";
 
 export default function DiscountsPage() {
   const {
     discounts,
-    giftCards,
+    fetchDiscounts,
     addDiscount,
     updateDiscount,
     deleteDiscount,
-    addGiftCard,
-    updateGiftCard,
-    deleteGiftCard,
-  } = useStore();
+  } = useStore(
+    useShallow((state) => ({
+      discounts: state.discounts,
+      addDiscount: state.addDiscount,
+      fetchDiscounts: state.fetchDiscounts,
+      updateDiscount: state.updateDiscount,
+      deleteDiscount: state.deleteDiscount,
+    }))
+  );
+
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("discounts");
   const [isAddDiscountOpen, setIsAddDiscountOpen] = useState(false);
-  const [isAddGiftCardOpen, setIsAddGiftCardOpen] = useState(false);
   const [isEditDiscountOpen, setIsEditDiscountOpen] = useState(false);
   const [isDeleteDiscountOpen, setIsDeleteDiscountOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [selectedDiscount, setSelectedDiscount] = useState<Discount | null>(
     null
   );
+
+  useEffect(() => {
+    const discounts = useStore.getState().discounts;
+    if (!discounts || discounts.length === 0) {
+      useStore
+        .getState()
+        .fetchDiscounts()
+        .then(() => {
+          const updatedDiscounts = useStore.getState().discounts;
+          console.log("[FETCHED_DISCOUNTS]", updatedDiscounts);
+          setLoading(false);
+        });
+    } else {
+      setLoading(false);
+    }
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex-1 space-y-4 p-8 pt-6">
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-10 w-[300px]" />
+          <Skeleton className="h-10 w-[120px]" />
+        </div>
+
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-6 w-[200px] mb-2" />
+            <Skeleton className="h-4 w-[300px]" />
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-[100px]" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+
+            <Skeleton className="h-24 w-full" />
+
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-[150px]" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-[150px]" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+
+            <div className="flex justify-end space-x-2">
+              <Skeleton className="h-10 w-[100px]" />
+              <Skeleton className="h-10 w-[150px]" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   const filteredDiscounts = discounts.filter(
     (discount) =>
@@ -64,16 +132,68 @@ export default function DiscountsPage() {
         discount.description.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  const filteredGiftCards = giftCards.filter((giftCard) =>
-    giftCard.code.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const handleAddDiscount = async (discountData: Discount) => {
+    try {
+      await addDiscount(discountData);
+      await fetchDiscounts();
+      toast({
+        title: "Discount Created",
+        description: "Discount has been created successfully",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to create discount. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
 
-  const handleEditDiscount = (discount: Discount) => {
+  const handleUpdateDiscount = async (
+    id: string,
+    updatedData: Partial<Discount>
+  ) => {
+    try {
+      await updateDiscount(id, updatedData);
+      await fetchDiscounts();
+      toast({
+        title: "Discount Updated",
+        description: `${updatedData.code} has been updated successfully.`,
+      });
+    } catch (error) {
+      console.error(error);
+      toast({
+        title: "Error",
+        description: "There was a problem updating the discount.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteDiscount = async (id: string) => {
+    try {
+      await deleteDiscount(id);
+      await fetchDiscounts();
+      toast({
+        title: "Discount Deleted",
+        description: `${selectedDiscount?.code} has been deleted.`,
+      });
+    } catch (error) {
+      console.error(error);
+      toast({
+        title: "Error",
+        description: "There was a problem deleting the discount.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const openEditModal = (discount: Discount) => {
     setSelectedDiscount(discount);
     setIsEditDiscountOpen(true);
   };
 
-  const handleDeleteDiscount = (discount: Discount) => {
+  const openDeleteModal = (discount: Discount) => {
     setSelectedDiscount(discount);
     setIsDeleteDiscountOpen(true);
   };
@@ -81,26 +201,16 @@ export default function DiscountsPage() {
   return (
     <div className="flex-1 space-y-4 p-4 pt-6 md:p-8">
       <div className="flex items-center justify-between">
-        <h2 className="text-3xl font-bold tracking-tight">
-          Discounts & Gift Cards
-        </h2>
-        {activeTab === "discounts" ? (
-          <Button onClick={() => setIsAddDiscountOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Discount
-          </Button>
-        ) : (
-          <Button onClick={() => setIsAddGiftCardOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Gift Card
-          </Button>
-        )}
+        <h2 className="text-3xl font-bold tracking-tight">Discounts</h2>
+        <Button onClick={() => setIsAddDiscountOpen(true)}>
+          <Plus className="mr-2 h-4 w-4" />
+          Add Discount
+        </Button>
       </div>
 
       <Tabs defaultValue="discounts" onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="discounts">Discounts</TabsTrigger>
-          <TabsTrigger value="giftcards">Gift Cards</TabsTrigger>
         </TabsList>
 
         <div className="flex items-center mt-4">
@@ -108,11 +218,7 @@ export default function DiscountsPage() {
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               type="search"
-              placeholder={
-                activeTab === "discounts"
-                  ? "Search discounts..."
-                  : "Search gift cards..."
-              }
+              placeholder="Search discounts..."
               className="w-full pl-8"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -203,77 +309,14 @@ export default function DiscountsPage() {
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
                           <DropdownMenuItem
-                            onClick={() => handleEditDiscount(discount)}
+                            onClick={() => openEditModal(discount)}
                           >
                             <Edit className="mr-2 h-4 w-4" />
                             Edit
                           </DropdownMenuItem>
                           <DropdownMenuItem
-                            onClick={() => handleDeleteDiscount(discount)}
+                            onClick={() => openDeleteModal(discount)}
                           >
-                            <Trash className="mr-2 h-4 w-4" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="giftcards" className="space-y-4">
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Code</TableHead>
-                  <TableHead>Value</TableHead>
-                  <TableHead>Balance</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredGiftCards.map((giftCard) => (
-                  <TableRow key={giftCard.id}>
-                    <TableCell className="font-medium">
-                      {giftCard.code}
-                    </TableCell>
-                    <TableCell>₦{giftCard.value.toFixed(2)}</TableCell>
-                    <TableCell>₦{giftCard.balance.toFixed(2)}</TableCell>
-                    <TableCell>
-                      <span
-                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                          !giftCard.isDisabled
-                            ? "bg-green-100 text-green-800"
-                            : "bg-red-100 text-red-800"
-                        }`}
-                      >
-                        {!giftCard.isDisabled ? "Active" : "Inactive"}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      {format(giftCard.createdAt, "MMM dd, yyyy")}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
-                            <span className="sr-only">Open menu</span>
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuItem>
-                            <Edit className="mr-2 h-4 w-4" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
                             <Trash className="mr-2 h-4 w-4" />
                             Delete
                           </DropdownMenuItem>
@@ -292,27 +335,29 @@ export default function DiscountsPage() {
       <AddDiscountModal
         open={isAddDiscountOpen}
         onOpenChange={setIsAddDiscountOpen}
-        onAddDiscount={addDiscount}
+        onAddDiscount={handleAddDiscount}
       />
 
       <EditDiscountModal
         open={isEditDiscountOpen}
         onOpenChange={setIsEditDiscountOpen}
         discount={selectedDiscount}
-        onUpdateDiscount={updateDiscount}
+        onUpdateDiscount={(updated) => {
+          if (selectedDiscount) {
+            handleUpdateDiscount(selectedDiscount.id, updated);
+          }
+        }}
       />
 
       <DeleteDiscountModal
         open={isDeleteDiscountOpen}
         onOpenChange={setIsDeleteDiscountOpen}
         discount={selectedDiscount}
-        onDeleteDiscount={deleteDiscount}
-      />
-
-      <AddGiftCardModal
-        open={isAddGiftCardOpen}
-        onOpenChange={setIsAddGiftCardOpen}
-        onAddGiftCard={addGiftCard}
+        onDeleteDiscount={() => {
+          if (selectedDiscount) {
+            handleDeleteDiscount(selectedDiscount.id);
+          }
+        }}
       />
     </div>
   );

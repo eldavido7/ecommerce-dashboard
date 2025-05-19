@@ -55,3 +55,25 @@ model OrderItem {
   quantity  Int
   subtotal  Float    // 🆕 calculated per item
 }
+
+model Discount {
+  id           String    @id @default(cuid())
+  code         String    @unique
+  description  String?
+  type         DiscountType
+  value        Float
+  usageLimit   Int?
+  usageCount   Int       @default(0)
+  startsAt     DateTime
+  endsAt       DateTime?
+  isActive     Boolean
+  conditions   Json?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+enum DiscountType {
+  percentage
+  fixed_amount
+  free_shipping
+}

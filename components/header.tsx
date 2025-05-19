@@ -86,9 +86,6 @@ export function Header({ onMenuClick }: HeaderProps) {
               {user?.email}
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="cursor-pointer">
-              Settings
-            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem className="cursor-pointer" onClick={logout}>
               <LogOut className="mr-2 h-4 w-4" />

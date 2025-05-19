@@ -172,8 +172,8 @@ export function ViewOrderModal({
               <CardContent>
                 <div className="text-sm">
                   <p>
-                    {order.address.city}, {order.address.state}{" "}
-                    {order.address.postalCode}
+                    {order.address.address}, {order.address.city},{" "}
+                    {order.address.state} {order.address.postalCode}
                   </p>
                   <p>{order.address.country}</p>
                 </div>

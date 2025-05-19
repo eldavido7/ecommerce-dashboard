@@ -65,20 +65,7 @@ export interface Discount {
   conditions?: {
     minSubtotal?: number
     products?: string[]
-    collections?: string[]
   }
-  createdAt: Date
-  updatedAt: Date
-}
-
-// Gift Card Types
-export interface GiftCard {
-  id: string
-  code: string
-  value: number
-  balance: number
-  isDisabled: boolean
-  expiresAt?: Date
   createdAt: Date
   updatedAt: Date
 }

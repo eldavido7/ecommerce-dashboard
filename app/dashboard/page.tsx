@@ -39,9 +39,10 @@ const DonutChart = dynamic(() => import("@/components/charts/donut-chart"), {
 });
 
 export default function Dashboard() {
-  const { products, orders } = useStore();
+  const { products, orders, discounts } = useStore();
   const [ordersLoading, setOrdersLoading] = useState(true);
   const [productsLoading, setProductsLoading] = useState(true);
+  const [discountsLoading, setDiscountsLoading] = useState(true);
 
   useEffect(() => {
     const orders = useStore.getState().orders;
@@ -75,7 +76,23 @@ export default function Dashboard() {
     }
   }, []);
 
-  if (ordersLoading || productsLoading) {
+  useEffect(() => {
+    const discounts = useStore.getState().discounts;
+    if (!discounts || discounts.length === 0) {
+      useStore
+        .getState()
+        .fetchDiscounts()
+        .then(() => {
+          const updatedDiscounts = useStore.getState().discounts;
+          console.log("[FETCHED_DISCOUNTS]", updatedDiscounts);
+          setDiscountsLoading(false);
+        });
+    } else {
+      setDiscountsLoading(false);
+    }
+  }, []);
+
+  if (ordersLoading || productsLoading || discountsLoading) {
     return (
       <div className="flex-1 space-y-4 p-8 pt-6">
         <div className="flex items-center justify-between">

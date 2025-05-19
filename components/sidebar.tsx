@@ -35,7 +35,7 @@ const routes = [
     href: "/orders",
   },
   {
-    label: "Discounts & Gifts",
+    label: "Discounts",
     icon: Gift,
     href: "/discounts",
   },

@@ -1,5 +1,5 @@
 import { create } from "zustand"
-import type { Product, Order, Discount, GiftCard } from "@/types"
+import type { Product, Order, Discount } from "@/types"
 import { mockProducts, mockOrders, mockDiscounts, mockGiftCards } from "@/lib/mock-data"
 
 interface StoreState {
@@ -14,20 +14,14 @@ interface StoreState {
   orders: Order[];
   fetchOrders: () => Promise<void>;
   addOrder: (order: Omit<Order, "id" | "createdAt" | "updatedAt">) => Promise<void>;
-  updateOrderStatus: (id: string, status: Order["status"]) => void;
-  deleteOrder: (id: string) => Promise<void>;
+  updateOrder: (id: string, order: Partial<Order>) => Promise<void>;
 
   // Discounts
-  discounts: Discount[]
-  addDiscount: (discount: Discount) => void
-  updateDiscount: (id: string, discount: Partial<Discount>) => void
-  deleteDiscount: (id: string) => void
-
-  // Gift Cards
-  giftCards: GiftCard[]
-  addGiftCard: (giftCard: GiftCard) => void
-  updateGiftCard: (id: string, giftCard: Partial<GiftCard>) => void
-  deleteGiftCard: (id: string) => void
+  discounts: Discount[];
+  fetchDiscounts: () => Promise<void>;
+  addDiscount: (discount: Omit<Discount, "id" | "usageCount" | "createdAt" | "updatedAt">) => Promise<void>;
+  updateDiscount: (id: string, discount: Partial<Discount>) => Promise<void>;
+  deleteDiscount: (id: string) => Promise<void>;
 }
 
 export const useStore = create<StoreState>((set) => ({
@@ -106,6 +100,7 @@ export const useStore = create<StoreState>((set) => ({
               phone: order.phone,
             },
             address: {
+              address: order.address,
               city: order.city,
               state: order.state,
               postalCode: order.postalCode,
@@ -134,58 +129,78 @@ export const useStore = create<StoreState>((set) => ({
     set((state) => ({ orders: [newOrder, ...state.orders] }));
   },
 
-  updateOrderStatus: async (id, status) => {
+  updateOrder: async (id, updatedOrder) => {
     await fetch(`/api/orders/${id}`, {
       method: "PATCH",
+      body: JSON.stringify(updatedOrder),
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
     });
-
     set((state) => ({
       orders: state.orders.map((o) =>
-        o.id === id ? { ...o, status } : o
+        o.id === id ? { ...o, ...updatedOrder } : o
       ),
-    }));
-  },
-
-  deleteOrder: async (id) => {
-    await fetch(`/api/orders/${id}`, { method: "DELETE" });
-    set((state) => ({
-      orders: state.orders.filter((o) => o.id !== id),
     }));
   },
 
   // Discounts
-  discounts: mockDiscounts,
-  addDiscount: (discount) =>
-    set((state) => ({
-      discounts: [...state.discounts, discount],
-    })),
-  updateDiscount: (id, updatedDiscount) =>
-    set((state) => ({
-      discounts: state.discounts.map((discount) =>
-        discount.id === id ? { ...discount, ...updatedDiscount } : discount,
-      ),
-    })),
-  deleteDiscount: (id) =>
-    set((state) => ({
-      discounts: state.discounts.filter((discount) => discount.id !== id),
-    })),
+  discounts: [],
 
-  // Gift Cards
-  giftCards: mockGiftCards,
-  addGiftCard: (giftCard) =>
-    set((state) => ({
-      giftCards: [...state.giftCards, giftCard],
-    })),
-  updateGiftCard: (id, updatedGiftCard) =>
-    set((state) => ({
-      giftCards: state.giftCards.map((giftCard) =>
-        giftCard.id === id ? { ...giftCard, ...updatedGiftCard } : giftCard,
-      ),
-    })),
-  deleteGiftCard: (id) =>
-    set((state) => ({
-      giftCards: state.giftCards.filter((giftCard) => giftCard.id !== id),
-    })),
+  fetchDiscounts: async () => {
+    try {
+      const res = await fetch("/api/discounts");
+      if (!res.ok) throw new Error("Failed to fetch discounts");
+      const data = await res.json();
+      set({ discounts: data });
+    } catch (error) {
+      console.error("[FETCH_DISCOUNTS]", error);
+    }
+  },
+
+  addDiscount: async (discount) => {
+    try {
+      const res = await fetch("/api/discounts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(discount),
+      });
+      if (!res.ok) throw new Error("Failed to create discount");
+      const newDiscount = await res.json();
+      set((state) => ({
+        discounts: [newDiscount, ...state.discounts],
+      }));
+    } catch (error) {
+      console.error("[ADD_DISCOUNT]", error);
+    }
+  },
+
+  updateDiscount: async (id, updatedDiscount) => {
+    try {
+      const res = await fetch(`/api/discounts/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updatedDiscount),
+      });
+      if (!res.ok) throw new Error("Failed to update discount");
+      const updated = await res.json();
+
+      set((state) => ({
+        discounts: state.discounts.map((discount) =>
+          discount.id === id ? updated : discount,
+        ),
+      }));
+    } catch (error) {
+      console.error("[UPDATE_DISCOUNT]", error);
+    }
+  },
+
+  deleteDiscount: async (id) => {
+    try {
+      await fetch(`/api/discounts/${id}`, { method: "DELETE" });
+      set((state) => ({
+        discounts: state.discounts.filter((d) => d.id !== id),
+      }));
+    } catch (error) {
+      console.error("[DELETE_DISCOUNT]", error);
+    }
+  },
 }))
