@@ -16,7 +16,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AlertTriangle, DollarSign, Package, ShoppingCart } from "lucide-react";
-import { mockSalesData, mockProductPerformance } from "@/lib/mock-data";
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -28,8 +27,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useStore } from "@/store/store";
-import { AnalyticsOrder, OrderWithItems } from "@/types/index";
+import { getSalesData, getTopProducts, useStore } from "@/store/store";
 
 // Import charts with dynamic imports and disable SSR
 const PieChart = dynamic(() => import("@/components/charts/pie-chart"), {
@@ -74,6 +72,47 @@ export default function AnalyticsPage() {
       setProductsLoading(false);
     }
   }, []);
+
+  if (ordersLoading || productsLoading) {
+    return (
+      <div className="flex-1 space-y-4 p-8 pt-6">
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-10 w-[300px]" />
+          <Skeleton className="h-10 w-[120px]" />
+        </div>
+
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-6 w-[200px] mb-2" />
+            <Skeleton className="h-4 w-[300px]" />
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-[100px]" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+
+            <Skeleton className="h-24 w-full" />
+
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-[150px]" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-[150px]" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+
+            <div className="flex justify-end space-x-2">
+              <Skeleton className="h-10 w-[100px]" />
+              <Skeleton className="h-10 w-[150px]" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   // Calculate analytics metrics
   const totalRevenue = orders
@@ -129,80 +168,6 @@ export default function AnalyticsPage() {
   // Calculate low stock products (inventory < 10)
   const lowStockProducts = products.filter((product) => product.inventory < 10);
   const lowStockCount = lowStockProducts.length;
-
-  const getSalesData = (orders: AnalyticsOrder[]) => {
-    const revenueByMonth: Record<string, number> = {};
-    const orderCountByMonth: Record<string, number> = {};
-
-    orders.forEach((order) => {
-      const date = new Date(order.createdAt);
-      const month = `${date.getFullYear()}-${String(
-        date.getMonth() + 1
-      ).padStart(2, "0")}`;
-
-      if (!orderCountByMonth[month]) {
-        orderCountByMonth[month] = 0;
-      }
-      orderCountByMonth[month] += 1;
-
-      if (order.status === "DELIVERED") {
-        if (!revenueByMonth[month]) {
-          revenueByMonth[month] = 0;
-        }
-        const orderRevenue = order.items.reduce(
-          (sum, item) => sum + item.subtotal,
-          0
-        );
-        revenueByMonth[month] += orderRevenue;
-      }
-    });
-
-    const months = Object.keys(orderCountByMonth).sort();
-    return months.map((month) => ({
-      month,
-      revenue: revenueByMonth[month] || 0,
-      orderCount: orderCountByMonth[month],
-    }));
-  };
-
-  const getTopProducts = (orders: OrderWithItems[]) => {
-    const productStats: Record<
-      string,
-      { title: string; totalSold: number; totalRevenue: number }
-    > = {};
-
-    orders.forEach((order) => {
-      if (order.status !== "DELIVERED") return;
-
-      order.items.forEach((item) => {
-        const id = item.product.id;
-        if (!productStats[id]) {
-          productStats[id] = {
-            title: item.product.title,
-            totalSold: 0,
-            totalRevenue: 0,
-          };
-        }
-
-        productStats[id].totalSold += item.quantity;
-        productStats[id].totalRevenue += item.subtotal;
-      });
-    });
-
-    const products = Object.values(productStats);
-
-    const topByRevenue = [...products].sort(
-      (a, b) => b.totalRevenue - a.totalRevenue
-    );
-    const topByQuantity = [...products].sort(
-      (a, b) => b.totalSold - a.totalSold
-    );
-
-    return {
-      topByRevenue,
-      topByQuantity,
-    };
-  };
 
   const salesData = getSalesData(
     orders.map((order) => ({

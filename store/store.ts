@@ -1,6 +1,5 @@
 import { create } from "zustand"
-import type { Product, Order, Discount } from "@/types"
-import { mockProducts, mockOrders, mockDiscounts, mockGiftCards } from "@/lib/mock-data"
+import type { Product, Order, Discount, AnalyticsOrder, OrderWithItems } from "@/types"
 
 interface StoreState {
   // Products
@@ -204,3 +203,77 @@ export const useStore = create<StoreState>((set) => ({
     }
   },
 }))
+
+export function getTopProducts(orders: OrderWithItems[]) {
+  const productStats: Record<
+    string,
+    { title: string; totalSold: number; totalRevenue: number }
+  > = {};
+
+  orders.forEach((order) => {
+    if (order.status !== "DELIVERED") return;
+
+    order.items.forEach((item) => {
+      const id = item.product.id;
+      if (!productStats[id]) {
+        productStats[id] = {
+          title: item.product.title,
+          totalSold: 0,
+          totalRevenue: 0,
+        };
+      }
+
+      productStats[id].totalSold += item.quantity;
+      productStats[id].totalRevenue += item.subtotal;
+    });
+  });
+
+  const products = Object.values(productStats);
+
+  const topByRevenue = [...products].sort(
+    (a, b) => b.totalRevenue - a.totalRevenue
+  );
+  const topByQuantity = [...products].sort(
+    (a, b) => b.totalSold - a.totalSold
+  );
+
+  return {
+    topByRevenue,
+    topByQuantity,
+  };
+};
+
+export function getSalesData(orders: AnalyticsOrder[]) {
+  const revenueByMonth: Record<string, number> = {};
+  const orderCountByMonth: Record<string, number> = {};
+
+  orders.forEach((order) => {
+    const date = new Date(order.createdAt);
+    const month = `${date.getFullYear()}-${String(
+      date.getMonth() + 1
+    ).padStart(2, "0")}`;
+
+    if (!orderCountByMonth[month]) {
+      orderCountByMonth[month] = 0;
+    }
+    orderCountByMonth[month] += 1;
+
+    if (order.status === "DELIVERED") {
+      if (!revenueByMonth[month]) {
+        revenueByMonth[month] = 0;
+      }
+      const orderRevenue = order.items.reduce(
+        (sum, item) => sum + item.subtotal,
+        0
+      );
+      revenueByMonth[month] += orderRevenue;
+    }
+  });
+
+  const months = Object.keys(orderCountByMonth).sort();
+  return months.map((month) => ({
+    month,
+    revenue: revenueByMonth[month] || 0,
+    orderCount: orderCountByMonth[month],
+  }));
+};
