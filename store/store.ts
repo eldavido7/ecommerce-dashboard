@@ -1,4 +1,5 @@
 import { create } from "zustand"
+import { persist } from "zustand/middleware";
 import type { Product, Order, Discount, AnalyticsOrder, OrderWithItems } from "@/types"
 
 interface StoreState {
@@ -21,6 +22,22 @@ interface StoreState {
   addDiscount: (discount: Omit<Discount, "id" | "usageCount" | "createdAt" | "updatedAt">) => Promise<void>;
   updateDiscount: (id: string, discount: Partial<Discount>) => Promise<void>;
   deleteDiscount: (id: string) => Promise<void>;
+}
+
+// Users
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  lastActive: string;
+}
+
+interface AuthStore {
+  user: User | null;
+  isLoading: boolean;
+  login: (email: string, password: string) => Promise<boolean>;
+  logout: () => void;
+  setUser: (user: User | null) => void;
 }
 
 export const useStore = create<StoreState>((set) => ({
@@ -277,3 +294,52 @@ export function getSalesData(orders: AnalyticsOrder[]) {
     orderCount: orderCountByMonth[month],
   }));
 };
+
+export const useAuthStore = create<AuthStore>()(
+  persist(
+    (set, get) => ({
+      user: null,
+      isLoading: false,
+
+      login: async (email: string, password: string) => {
+        set({ isLoading: true });
+
+        try {
+          const res = await fetch("/api/auth", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, password }),
+          });
+
+          const data = await res.json();
+
+          if (res.ok && data.success) {
+            set({ user: data.user });
+            return true;
+          }
+
+          return false;
+        } catch (err) {
+          console.error("Login error:", err);
+          return false;
+        } finally {
+          set({ isLoading: false });
+        }
+      },
+
+      logout: () => {
+        set({ user: null });
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("auth");
+        }
+        window.location.href = "/login"; // force redirect
+      },
+
+      setUser: (user) => set({ user }),
+    }),
+    {
+      name: "auth", // localStorage key
+      partialize: (state) => ({ user: state.user }), // only persist user
+    }
+  )
+);

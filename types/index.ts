@@ -103,3 +103,11 @@ export type OrderWithItems = {
   status: string;
   items: ProductItem[];
 };
+
+//User Types
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  lastActive: string;
+}

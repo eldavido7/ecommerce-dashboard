@@ -16,7 +16,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useAuth } from "@/contexts/auth-context";
+import { useAuthStore } from "@/store/store";
 
 const routes = [
   {
@@ -66,7 +66,7 @@ interface SidebarProps {
 export function Sidebar({ isOpen, onClose, open, onOpenChange }: SidebarProps) {
   const pathname = usePathname();
   const [isMounted, setIsMounted] = useState(false);
-  const { user } = useAuth();
+  const { user } = useAuthStore();
 
   // Handle initial mounting to avoid hydration mismatch
   useEffect(() => {

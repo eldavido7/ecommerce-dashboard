@@ -1,10 +1,9 @@
 "use client";
 
-import type React from "react";
-
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/contexts/auth-context";
+import { useAuthStore } from "@/store/store";
+
 import {
   Card,
   CardContent,
@@ -23,9 +22,9 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const { login, user } = useAuth();
   const router = useRouter();
+
+  const { user, login, isLoading } = useAuthStore();
 
   // Redirect if already logged in
   useEffect(() => {
@@ -37,19 +36,12 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    setIsLoading(true);
 
-    try {
-      const success = await login(email, password);
-      if (success) {
-        router.push("/dashboard");
-      } else {
-        setError("Invalid email or password");
-      }
-    } catch (err) {
-      setError("An error occurred. Please try again.");
-    } finally {
-      setIsLoading(false);
+    const success = await login(email, password);
+    if (success) {
+      router.push("/dashboard");
+    } else {
+      setError("Invalid email or password");
     }
   };
 

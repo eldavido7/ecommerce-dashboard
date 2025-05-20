@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
-import { useAuth } from "@/contexts/auth-context";
+import { useAuthStore } from "@/store/store";
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -21,7 +21,7 @@ interface HeaderProps {
 
 export function Header({ onMenuClick }: HeaderProps) {
   const { setTheme, theme } = useTheme();
-  const { user, logout } = useAuth();
+  const { user, logout } = useAuthStore();
   const [mounted, setMounted] = useState(false);
 
   // Ensure component is mounted to avoid hydration mismatch

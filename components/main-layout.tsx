@@ -7,7 +7,7 @@ import { Sidebar } from "@/components/sidebar";
 import { Header } from "@/components/header";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { usePathname, useRouter } from "next/navigation";
-import { useAuth } from "@/contexts/auth-context";
+import { useAuthStore } from "@/store/store";
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -16,7 +16,7 @@ interface MainLayoutProps {
 export function MainLayout({ children }: MainLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const pathname = usePathname();
-  const { user, isLoading } = useAuth();
+  const { user, isLoading } = useAuthStore();
   const router = useRouter();
 
   // Check if we're on the login page
