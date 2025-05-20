@@ -15,9 +15,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { DollarSign, ShoppingCart } from "lucide-react";
+import { AlertTriangle, DollarSign, Package, ShoppingCart } from "lucide-react";
 import { mockSalesData, mockProductPerformance } from "@/lib/mock-data";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -28,6 +28,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useStore } from "@/store/store";
+import { AnalyticsOrder, OrderWithItems } from "@/types/index";
 
 // Import charts with dynamic imports and disable SSR
 const PieChart = dynamic(() => import("@/components/charts/pie-chart"), {
@@ -37,38 +39,203 @@ const PieChart = dynamic(() => import("@/components/charts/pie-chart"), {
 
 export default function AnalyticsPage() {
   const [timeRange, setTimeRange] = useState("year");
+  const { products, orders, discounts } = useStore();
+  const [ordersLoading, setOrdersLoading] = useState(true);
+  const [productsLoading, setProductsLoading] = useState(true);
+
+  useEffect(() => {
+    const orders = useStore.getState().orders;
+    if (!orders || orders.length === 0) {
+      useStore
+        .getState()
+        .fetchOrders()
+        .then(() => {
+          const updatedOrders = useStore.getState().orders;
+          console.log("[FETCHED_ORDERS]", updatedOrders);
+          setOrdersLoading(false);
+        });
+    } else {
+      setOrdersLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const products = useStore.getState().products;
+    if (!products || products.length === 0) {
+      useStore
+        .getState()
+        .fetchProducts()
+        .then(() => {
+          const updatedProducts = useStore.getState().products;
+          console.log("[FETCHED_PRODUCTS]", updatedProducts);
+          setProductsLoading(false);
+        });
+    } else {
+      setProductsLoading(false);
+    }
+  }, []);
 
   // Calculate analytics metrics
-  const totalRevenue = mockSalesData.reduce(
-    (sum, data) => sum + data.revenue,
-    0
-  );
-  const totalOrders = mockSalesData.reduce((sum, data) => sum + data.orders, 0);
+  const totalRevenue = orders
+    .filter((order) => order.status === "DELIVERED")
+    .reduce((sum, order) => {
+      const orderTotal = order.items.reduce(
+        (orderSum, item) => orderSum + item.subtotal,
+        0
+      );
+      return sum + orderTotal;
+    }, 0);
+
+  const totalOrders = orders.length;
+  const totalProducts = products.length;
   const averageOrderValue = totalRevenue / totalOrders;
 
   // Prepare data for charts
-  const categoryData = [
-    { name: "Tinctures", value: 35 },
-    { name: "Capsules", value: 25 },
-    { name: "Teas", value: 15 },
-    { name: "Topicals", value: 15 },
-    { name: "Extracts", value: 10 },
-  ];
+  const categoryData = products.reduce((acc, product) => {
+    const category = acc.find((c) => c.name === product.category);
+    if (category) {
+      category.value += 1;
+    } else {
+      acc.push({ name: product.category, value: 1 });
+    }
+    return acc;
+  }, [] as { name: string; value: number }[]);
+
+  // Calculate recent stats
+  const pendingOrders = orders.filter(
+    (order) => order.status === "PENDING"
+  ).length;
+  const processingOrders = orders.filter(
+    (order) => order.status === "PROCESSING"
+  ).length;
+  const shippedOrders = orders.filter(
+    (order) => order.status === "SHIPPED"
+  ).length;
+  const deliveredOrders = orders.filter(
+    (order) => order.status === "DELIVERED"
+  ).length;
 
   const statusData = [
-    { name: "Pending", value: 20 },
-    { name: "Processing", value: 15 },
-    { name: "Shipped", value: 25 },
-    { name: "Delivered", value: 35 },
-    { name: "Canceled", value: 5 },
-  ];
+    { name: "Pending", value: pendingOrders },
+    { name: "Processing", value: processingOrders },
+    { name: "Shipped", value: shippedOrders },
+    { name: "Delivered", value: deliveredOrders },
+    {
+      name: "Canceled",
+      value: orders.filter((order) => order.status === "CANCELED").length,
+    },
+  ].filter((item) => item.value > 0);
 
-  const paymentMethodData = [
-    { name: "Credit Card", value: 65 },
-    { name: "Bank Transfer", value: 20 },
-    { name: "Cash on Delivery", value: 10 },
-    { name: "Mobile Money", value: 5 },
-  ];
+  // Calculate low stock products (inventory < 10)
+  const lowStockProducts = products.filter((product) => product.inventory < 10);
+  const lowStockCount = lowStockProducts.length;
+
+  const getSalesData = (orders: AnalyticsOrder[]) => {
+    const revenueByMonth: Record<string, number> = {};
+    const orderCountByMonth: Record<string, number> = {};
+
+    orders.forEach((order) => {
+      const date = new Date(order.createdAt);
+      const month = `${date.getFullYear()}-${String(
+        date.getMonth() + 1
+      ).padStart(2, "0")}`;
+
+      if (!orderCountByMonth[month]) {
+        orderCountByMonth[month] = 0;
+      }
+      orderCountByMonth[month] += 1;
+
+      if (order.status === "DELIVERED") {
+        if (!revenueByMonth[month]) {
+          revenueByMonth[month] = 0;
+        }
+        const orderRevenue = order.items.reduce(
+          (sum, item) => sum + item.subtotal,
+          0
+        );
+        revenueByMonth[month] += orderRevenue;
+      }
+    });
+
+    const months = Object.keys(orderCountByMonth).sort();
+    return months.map((month) => ({
+      month,
+      revenue: revenueByMonth[month] || 0,
+      orderCount: orderCountByMonth[month],
+    }));
+  };
+
+  const getTopProducts = (orders: OrderWithItems[]) => {
+    const productStats: Record<
+      string,
+      { title: string; totalSold: number; totalRevenue: number }
+    > = {};
+
+    orders.forEach((order) => {
+      if (order.status !== "DELIVERED") return;
+
+      order.items.forEach((item) => {
+        const id = item.product.id;
+        if (!productStats[id]) {
+          productStats[id] = {
+            title: item.product.title,
+            totalSold: 0,
+            totalRevenue: 0,
+          };
+        }
+
+        productStats[id].totalSold += item.quantity;
+        productStats[id].totalRevenue += item.subtotal;
+      });
+    });
+
+    const products = Object.values(productStats);
+
+    const topByRevenue = [...products].sort(
+      (a, b) => b.totalRevenue - a.totalRevenue
+    );
+    const topByQuantity = [...products].sort(
+      (a, b) => b.totalSold - a.totalSold
+    );
+
+    return {
+      topByRevenue,
+      topByQuantity,
+    };
+  };
+
+  const salesData = getSalesData(
+    orders.map((order) => ({
+      ...order,
+      createdAt:
+        order.createdAt instanceof Date
+          ? order.createdAt.toISOString()
+          : order.createdAt,
+    }))
+  ) as any;
+  const { topByRevenue, topByQuantity } = getTopProducts(
+    orders.map((order) => ({
+      ...order,
+      createdAt:
+        order.createdAt instanceof Date
+          ? order.createdAt.toISOString()
+          : order.createdAt,
+    }))
+  );
+
+  const productPerformance = topByRevenue.map((p) => ({
+    id: p.title, // or p.id if available
+    title: p.title,
+    sales: p.totalSold,
+    revenue: p.totalRevenue,
+    avgPrice: p.totalRevenue / p.totalSold,
+    performance:
+      p.totalRevenue > 30000
+        ? "High"
+        : p.totalRevenue > 10000
+        ? "Medium"
+        : "Low",
+  }));
 
   return (
     <div className="flex-1 space-y-4 p-4 pt-6 md:p-8">
@@ -142,19 +309,27 @@ export default function AnalyticsPage() {
                 </p>
               </CardContent>
             </Card>
-
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Conversion Rate
-                </CardTitle>
-                <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+                <CardTitle className="text-sm font-medium">Products</CardTitle>
+                <Package className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">3.2%</div>
-                <p className="text-xs text-muted-foreground">
-                  +0.5% from previous period
-                </p>
+                <div className="text-2xl font-bold">{totalProducts}</div>
+                <div className="flex items-center pt-1">
+                  {lowStockCount > 0 ? (
+                    <>
+                      <AlertTriangle className="mr-1 h-3 w-3 text-amber-500" />
+                      <span className="text-xs text-amber-500 font-medium">
+                        {lowStockCount} low stock
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">
+                      All products in stock
+                    </span>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -208,7 +383,7 @@ export default function AnalyticsPage() {
 
         <TabsContent value="sales" className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
-            <Card className="col-span-1">
+            {/* <Card className="col-span-1">
               <CardHeader>
                 <CardTitle>Payment Methods</CardTitle>
                 <CardDescription>
@@ -225,9 +400,9 @@ export default function AnalyticsPage() {
                   height={350}
                 />
               </CardContent>
-            </Card>
+            </Card> */}
 
-            <Card className="col-span-1">
+            {/* <Card className="col-span-1">
               <CardHeader>
                 <CardTitle>Sales by Time of Day</CardTitle>
                 <CardDescription>When customers are shopping</CardDescription>
@@ -249,7 +424,7 @@ export default function AnalyticsPage() {
                   height={350}
                 />
               </CardContent>
-            </Card>
+            </Card> */}
           </div>
 
           <Card>
@@ -273,22 +448,29 @@ export default function AnalyticsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {mockSalesData.map((data) => (
-                      <TableRow key={data.date}>
-                        <TableCell className="font-medium">
-                          {data.date}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {data.orders}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          ₦{data.revenue.toFixed(2)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          ₦{(data.revenue / data.orders).toFixed(2)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {salesData.map(
+                      (data: {
+                        month: string;
+                        revenue: number;
+                        orderCount: number;
+                      }) => (
+                        <TableRow key={data.month}>
+                          {/* Use 'month' as the unique key */}
+                          <TableCell className="font-medium">
+                            {data.month}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {data.orderCount}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            ₦{data.revenue.toFixed(2)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            ₦{(data.revenue / data.orderCount).toFixed(2)}
+                          </TableCell>
+                        </TableRow>
+                      )
+                    )}
                   </TableBody>
                 </Table>
               </div>
@@ -304,9 +486,9 @@ export default function AnalyticsPage() {
               </CardHeader>
               <CardContent>
                 <PieChart
-                  data={mockProductPerformance as any}
+                  data={topByRevenue as any}
                   index="title"
-                  categories={["revenue"]}
+                  categories={["totalRevenue"]} // ← correct key from your data
                   colors={[
                     "#3b82f6",
                     "#22c55e",
@@ -326,18 +508,10 @@ export default function AnalyticsPage() {
               </CardHeader>
               <CardContent>
                 <PieChart
-                  data={mockProductPerformance as any}
+                  data={topByQuantity as any}
                   index="title"
-                  categories={["sales"]}
-                  colors={[
-                    "#3b82f6",
-                    "#22c55e",
-                    "#eab308",
-                    "#a855f7",
-                    "#6366f1",
-                  ]}
+                  categories={["totalSold"]}
                   valueFormatter={(value) => `${value.toLocaleString()} units`}
-                  height={350}
                 />
               </CardContent>
             </Card>
@@ -361,8 +535,8 @@ export default function AnalyticsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {mockProductPerformance.map((product) => (
-                      <TableRow key={product.id}>
+                    {productPerformance.map((product) => (
+                      <TableRow key={product.title}>
                         <TableCell className="font-medium">
                           {product.title}
                         </TableCell>
@@ -373,23 +547,19 @@ export default function AnalyticsPage() {
                           ₦{product.revenue.toFixed(2)}
                         </TableCell>
                         <TableCell className="text-right">
-                          ₦{(product.revenue / product.sales).toFixed(2)}
+                          ₦{product.avgPrice.toFixed(2)}
                         </TableCell>
                         <TableCell className="text-right">
                           <span
                             className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                              product.revenue > 30000
+                              product.performance === "High"
                                 ? "bg-green-100 text-green-800"
-                                : product.revenue > 10000
+                                : product.performance === "Medium"
                                 ? "bg-yellow-100 text-yellow-800"
                                 : "bg-red-100 text-red-800"
                             }`}
                           >
-                            {product.revenue > 30000
-                              ? "High"
-                              : product.revenue > 10000
-                              ? "Medium"
-                              : "Low"}
+                            {product.performance}
                           </span>
                         </TableCell>
                       </TableRow>

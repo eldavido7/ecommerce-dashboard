@@ -83,3 +83,23 @@ export interface ProductPerformance {
   sales: number
   revenue: number
 }
+
+export type AnalyticsOrder = {
+  createdAt: string;
+  status: string;
+  items: { subtotal: number }[];
+};
+
+export type ProductItem = {
+  product: {
+    id: string;
+    title: string;
+  };
+  quantity: number;
+  subtotal: number;
+};
+
+export type OrderWithItems = {
+  status: string;
+  items: ProductItem[];
+};
