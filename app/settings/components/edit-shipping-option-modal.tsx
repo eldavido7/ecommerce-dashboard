@@ -1,8 +1,8 @@
-"use client"
+"use client";
 
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -10,22 +10,21 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-
-interface ShippingOption {
-  id: string
-  name: string
-  price: number
-  deliveryTime: string
-  status: "active" | "conditional"
-}
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { ShippingOption } from "@/types/index";
 
 interface EditShippingOptionModalProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  shippingOption: ShippingOption | null
-  onEditShippingOption: (option: ShippingOption) => void
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  shippingOption: ShippingOption | null;
+  onEditShippingOption: (option: ShippingOption) => void;
 }
 
 export function EditShippingOptionModal({
@@ -34,7 +33,7 @@ export function EditShippingOptionModal({
   shippingOption,
   onEditShippingOption,
 }: EditShippingOptionModalProps) {
-  if (!shippingOption) return null
+  if (!shippingOption) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -45,15 +44,15 @@ export function EditShippingOptionModal({
         </DialogHeader>
         <form
           onSubmit={(e) => {
-            e.preventDefault()
-            const formData = new FormData(e.currentTarget)
+            e.preventDefault();
+            const formData = new FormData(e.currentTarget);
             onEditShippingOption({
               id: shippingOption.id,
               name: formData.get("name") as string,
               price: Number.parseFloat(formData.get("price") as string),
               deliveryTime: formData.get("deliveryTime") as string,
-              status: formData.get("status") as "active" | "conditional",
-            })
+              status: formData.get("status") as "ACTIVE" | "CONDITIONAL",
+            });
           }}
         >
           <div className="grid gap-4 py-4">
@@ -105,14 +104,18 @@ export function EditShippingOptionModal({
                   <SelectValue placeholder="Select status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="conditional">Conditional</SelectItem>
+                  <SelectItem value="ACTIVE">Active</SelectItem>
+                  <SelectItem value="CONDITIONAL">Conditional</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" type="button" onClick={() => onOpenChange(false)}>
+            <Button
+              variant="outline"
+              type="button"
+              onClick={() => onOpenChange(false)}
+            >
               Cancel
             </Button>
             <Button type="submit">Save Changes</Button>
@@ -120,5 +123,5 @@ export function EditShippingOptionModal({
         </form>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

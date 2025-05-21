@@ -1,7 +1,7 @@
-"use client"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+"use client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -9,41 +9,59 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-
-interface ShippingOption {
-  id?: string
-  name: string
-  price: number
-  deliveryTime: string
-  status: "active" | "conditional"
-}
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { ShippingOption } from "@/types/index";
 
 interface AddShippingOptionModalProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  onAddShippingOption: (option: ShippingOption) => void
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onAddShippingOption: (option: Omit<ShippingOption, "id">) => void;
 }
 
-export function AddShippingOptionModal({ open, onOpenChange, onAddShippingOption }: AddShippingOptionModalProps) {
+export function AddShippingOptionModal({
+  open,
+  onOpenChange,
+  onAddShippingOption,
+}: AddShippingOptionModalProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add Shipping Option</DialogTitle>
-          <DialogDescription>Add a new shipping option to your store</DialogDescription>
+          <DialogDescription>
+            Add a new shipping option to your store
+          </DialogDescription>
         </DialogHeader>
         <form
           onSubmit={(e) => {
-            e.preventDefault()
-            const formData = new FormData(e.currentTarget)
-            onAddShippingOption({
+            e.preventDefault();
+            const formData = new FormData(e.currentTarget);
+            const option = {
               name: formData.get("name") as string,
               price: Number.parseFloat(formData.get("price") as string),
               deliveryTime: formData.get("deliveryTime") as string,
-              status: formData.get("status") as "active" | "conditional",
-            })
+              status: formData.get("status") as "ACTIVE" | "CONDITIONAL",
+            };
+            if (
+              !option.name.trim() ||
+              isNaN(option.price) ||
+              option.price < 0 ||
+              !option.deliveryTime.trim()
+            ) {
+              alert(
+                "Please fill in all fields correctly. Price must be non-negative."
+              );
+              return;
+            }
+            onAddShippingOption(option);
+            e.currentTarget.reset();
           }}
         >
           <div className="grid gap-4 py-4">
@@ -51,7 +69,12 @@ export function AddShippingOptionModal({ open, onOpenChange, onAddShippingOption
               <Label htmlFor="shipping-name" className="text-right">
                 Name
               </Label>
-              <Input id="shipping-name" name="name" className="col-span-3" required />
+              <Input
+                id="shipping-name"
+                name="name"
+                className="col-span-3"
+                required
+              />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="shipping-price" className="text-right">
@@ -71,25 +94,34 @@ export function AddShippingOptionModal({ open, onOpenChange, onAddShippingOption
               <Label htmlFor="shipping-delivery" className="text-right">
                 Delivery Time
               </Label>
-              <Input id="shipping-delivery" name="deliveryTime" className="col-span-3" required />
+              <Input
+                id="shipping-delivery"
+                name="deliveryTime"
+                className="col-span-3"
+                required
+              />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="shipping-status" className="text-right">
                 Status
               </Label>
-              <Select name="status" defaultValue="active">
+              <Select name="status" defaultValue="ACTIVE">
                 <SelectTrigger className="col-span-3">
                   <SelectValue placeholder="Select status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="conditional">Conditional</SelectItem>
+                  <SelectItem value="ACTIVE">Active</SelectItem>
+                  <SelectItem value="CONDITIONAL">Conditional</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" type="button" onClick={() => onOpenChange(false)}>
+            <Button
+              variant="outline"
+              type="button"
+              onClick={() => onOpenChange(false)}
+            >
               Cancel
             </Button>
             <Button type="submit">Add Shipping Option</Button>
@@ -97,5 +129,5 @@ export function AddShippingOptionModal({ open, onOpenChange, onAddShippingOption
         </form>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

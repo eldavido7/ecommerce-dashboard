@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -26,143 +26,249 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Edit, MoreHorizontal, Plus, Trash, User } from "lucide-react";
+import {
+  Edit,
+  MoreHorizontal,
+  Plus,
+  Trash,
+  User as UserIcon,
+} from "lucide-react";
 import { AddShippingOptionModal } from "./components/add-shipping-option-modal";
 import { EditShippingOptionModal } from "./components/edit-shipping-option-modal";
 import { AddUserModal } from "./components/add-user-modal";
 import { EditUserModal } from "./components/edit-user-modal";
 import { DeleteUserModal } from "./components/delete-user-modal";
 import { useToast } from "@/components/ui/use-toast";
-
-interface ShippingOption {
-  id: string;
-  name: string;
-  price: number;
-  deliveryTime: string;
-  status: "active" | "conditional";
-}
-
-interface UserData {
-  id: string;
-  name: string;
-  email: string;
-  lastActive: string;
-}
+import { ShippingOption, User } from "@/types/index";
+import { useSettingsStore } from "@/store/store";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function SettingsPage() {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState("general");
+  const [activeTab, setActiveTab] = useState("shipping");
 
-  // Shipping state
+  const [loading, setLoading] = useState(true);
+
+  // Add these state variables at the top level of your component
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [shippingToDelete, setShippingToDelete] = useState<string | null>(null);
+
+  // Add this function to handle the actual deletion after confirmation
+  const handleDeleteConfirm = () => {
+    if (shippingToDelete) {
+      deleteShippingOption(shippingToDelete);
+      setDeleteDialogOpen(false);
+      setShippingToDelete(null);
+    }
+  };
+
+  // Shipping modal states
   const [isAddShippingOpen, setIsAddShippingOpen] = useState(false);
   const [isEditShippingOpen, setIsEditShippingOpen] = useState(false);
   const [currentShipping, setCurrentShipping] = useState<ShippingOption | null>(
     null
   );
-  const [shippingOptions, setShippingOptions] = useState<ShippingOption[]>([
-    {
-      id: "ship_1",
-      name: "Standard Shipping",
-      price: 1500.0,
-      deliveryTime: "3-5 business days",
-      status: "active",
-    },
-    {
-      id: "ship_2",
-      name: "Express Shipping",
-      price: 1500.0,
-      deliveryTime: "1-2 business days",
-      status: "active",
-    },
-    {
-      id: "ship_3",
-      name: "Free Shipping",
-      price: 0.0,
-      deliveryTime: "5-7 business days",
-      status: "conditional",
-    },
-  ]);
 
-  // User state
+  // User modal states
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
   const [isEditUserOpen, setIsEditUserOpen] = useState(false);
   const [isDeleteUserOpen, setIsDeleteUserOpen] = useState(false);
-  const [currentUser, setCurrentUser] = useState<UserData | null>(null);
-  const [users, setUsers] = useState<UserData[]>([
-    {
-      id: "user_1",
-      name: "John Doe",
-      email: "john.doe@example.com",
-      lastActive: "Just now",
-    },
-    {
-      id: "user_2",
-      name: "Jane Smith",
-      email: "jane.smith@example.com",
-      lastActive: "2 hours ago",
-    },
-    {
-      id: "user_3",
-      name: "Robert Johnson",
-      email: "robert.johnson@example.com",
-      lastActive: "1 day ago",
-    },
-  ]);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+
+  // Access store data and methods
+  const {
+    users,
+    shippingOptions,
+    fetchSettings,
+    createUser,
+    updateUser,
+    deleteUser,
+    createShipping,
+    updateShipping,
+    deleteShipping,
+  } = useSettingsStore();
+
+  useEffect(() => {
+    if (users.length === 0 || shippingOptions.length === 0) {
+      fetchSettings()
+        .then(() => {
+          setLoading(false);
+        })
+        .catch((error) => {
+          console.error("Fetch settings error:", error);
+          setLoading(false);
+          toast({
+            title: "Error",
+            description: "Failed to fetch settings. Please try again.",
+            variant: "destructive",
+          });
+        });
+    } else {
+      setLoading(false);
+    }
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex-1 space-y-4 p-8 pt-6">
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-10 w-[300px]" />
+          <Skeleton className="h-10 w-[120px]" />
+        </div>
+
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-6 w-[200px] mb-2" />
+            <Skeleton className="h-4 w-[300px]" />
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-[100px]" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+
+            <Skeleton className="h-24 w-full" />
+
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-[150px]" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-[150px]" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+
+            <div className="flex justify-end space-x-2">
+              <Skeleton className="h-10 w-[100px]" />
+              <Skeleton className="h-10 w-[150px]" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   // Shipping handlers
-  const addShippingOption = (option: Omit<ShippingOption, "id">) => {
-    const newOption = {
-      ...option,
-      id: `ship_${Date.now()}`,
-    };
-    setShippingOptions([...shippingOptions, newOption]);
-    setIsAddShippingOpen(false);
-    toast({
-      title: "Shipping option added",
-      description: "The shipping option has been added successfully.",
-    });
+  const addShippingOption = async (option: Omit<ShippingOption, "id">) => {
+    try {
+      await createShipping(option);
+      setIsAddShippingOpen(false);
+      toast({
+        title: "Shipping option added",
+        description: "The shipping option has been added successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to add shipping option. Please try again.",
+        variant: "destructive",
+      });
+      console.error("Add shipping error:", error);
+    }
   };
 
-  const editShippingOption = (option: ShippingOption) => {
-    setShippingOptions(
-      shippingOptions.map((item) => (item.id === option.id ? option : item))
-    );
-    setIsEditShippingOpen(false);
-    setCurrentShipping(null);
-    toast({
-      title: "Shipping option updated",
-      description: "The shipping option has been updated successfully.",
-    });
+  const editShippingOption = async (option: ShippingOption) => {
+    try {
+      await updateShipping(option);
+      setIsEditShippingOpen(false);
+      setCurrentShipping(null);
+      toast({
+        title: "Shipping option updated",
+        description: "The shipping option has been updated successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update shipping option. Please try again.",
+        variant: "destructive",
+      });
+      console.error("Update shipping error:", error);
+    }
   };
 
-  const deleteShippingOption = (id: string) => {
-    setShippingOptions(shippingOptions.filter((item) => item.id !== id));
-    toast({
-      title: "Shipping option deleted",
-      description: "The shipping option has been deleted successfully.",
-    });
+  const deleteShippingOption = async (id: string) => {
+    try {
+      await deleteShipping(id);
+      toast({
+        title: "Shipping option deleted",
+        description: "The shipping option has been deleted successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete shipping option. Please try again.",
+        variant: "destructive",
+      });
+      console.error("Delete shipping error:", error);
+    }
   };
 
   // User handlers
-  const addUser = (userData: Omit<UserData, "id" | "lastActive">) => {
-    const newUser = {
-      ...userData,
-      id: `user_${Date.now()}`,
-      lastActive: "Just now",
-    };
-    setUsers([...users, newUser]);
-    setIsAddUserOpen(false);
+  const addUser = async (userData: Omit<User, "id" | "lastActive">) => {
+    try {
+      await createUser(userData);
+      setIsAddUserOpen(false);
+      toast({
+        title: "User added",
+        description: "The user has been added successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to add user. Please try again.",
+        variant: "destructive",
+      });
+      console.error("Add user error:", error);
+    }
   };
 
-  const editUser = (userData: UserData) => {
-    setUsers(users.map((user) => (user.id === userData.id ? userData : user)));
-    setIsEditUserOpen(false);
-    setCurrentUser(null);
+  const editUser = async (userData: User) => {
+    try {
+      await updateUser(userData);
+      setIsEditUserOpen(false);
+      setCurrentUser(null);
+      toast({
+        title: "User updated",
+        description: "The user has been updated successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update user. Please try again.",
+        variant: "destructive",
+      });
+      console.error("Update user error:", error);
+    }
   };
 
-  const deleteUser = (userId: string) => {
-    setUsers(users.filter((user) => user.id !== userId));
-    setCurrentUser(null);
+  const removeUser = async (userId: string) => {
+    try {
+      await deleteUser(userId);
+      setCurrentUser(null);
+      setIsDeleteUserOpen(false);
+      toast({
+        title: "User deleted",
+        description: "The user has been deleted successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete user. Please try again.",
+        variant: "destructive",
+      });
+      console.error("Delete user error:", error);
+    }
   };
 
   return (
@@ -203,19 +309,19 @@ export default function SettingsPage() {
                         <TableCell className="font-medium">
                           {option.name}
                         </TableCell>
-                        <TableCell>₦{option.price.toFixed(2)}</TableCell>
+                        <TableCell>₦{option.price}</TableCell>
                         <TableCell>{option.deliveryTime}</TableCell>
                         <TableCell>
                           <span
                             className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                              option.status === "active"
+                              option.status === "ACTIVE"
                                 ? "bg-green-100 text-green-800"
                                 : "bg-yellow-100 text-yellow-800"
                             }`}
                           >
-                            {option.status === "active"
-                              ? "Active"
-                              : "Conditional"}
+                            {option.status === "ACTIVE"
+                              ? "ACTIVE"
+                              : "CONDITIONAL"}
                           </span>
                         </TableCell>
                         <TableCell className="text-right">
@@ -238,7 +344,10 @@ export default function SettingsPage() {
                                 Edit
                               </DropdownMenuItem>
                               <DropdownMenuItem
-                                onClick={() => deleteShippingOption(option.id)}
+                                onClick={() => {
+                                  setShippingToDelete(option.id);
+                                  setDeleteDialogOpen(true);
+                                }}
                               >
                                 <Trash className="mr-2 h-4 w-4" />
                                 Delete
@@ -259,6 +368,29 @@ export default function SettingsPage() {
               </div>
             </CardContent>
           </Card>
+
+          <AlertDialog
+            open={deleteDialogOpen}
+            onOpenChange={setDeleteDialogOpen}
+          >
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This action cannot be undone. This will permanently delete the
+                  shipping option.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => setShippingToDelete(null)}>
+                  Cancel
+                </AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteConfirm}>
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
           {/* Shipping Modals */}
           <AddShippingOptionModal
@@ -303,13 +435,24 @@ export default function SettingsPage() {
                       <TableRow key={user.id}>
                         <TableCell className="font-medium">
                           <div className="flex items-center">
-                            <User className="mr-2 h-4 w-4" />
+                            <UserIcon className="mr-2 h-4 w-4" />
                             {user.name}
                           </div>
                         </TableCell>
                         <TableCell>{user.email}</TableCell>
-
-                        <TableCell>{user.lastActive}</TableCell>
+                        <TableCell>
+                          {(() => {
+                            const date = new Date(user.lastActive);
+                            return `${date.toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })} at ${date.toLocaleTimeString("en-US", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}`;
+                          })()}
+                        </TableCell>
                         <TableCell className="text-right">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -368,7 +511,7 @@ export default function SettingsPage() {
             open={isDeleteUserOpen}
             onOpenChange={setIsDeleteUserOpen}
             user={currentUser}
-            onDeleteUser={deleteUser}
+            onDeleteUser={removeUser}
           />
         </TabsContent>
       </Tabs>

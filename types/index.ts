@@ -105,9 +105,18 @@ export type OrderWithItems = {
 };
 
 //User Types
-interface User {
+export interface User {
   id: string;
   name: string;
   email: string;
+  password?: string; // Optional since it may not be returned in GET responses
   lastActive: string;
+}
+
+export interface ShippingOption {
+  id: string;
+  name: string;
+  price: number;
+  deliveryTime: string;
+  status: "ACTIVE" | "CONDITIONAL";
 }

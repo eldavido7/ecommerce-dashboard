@@ -11,21 +11,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { toast } from "@/components/ui/use-toast";
-
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  lastActive: string;
-}
+import { User } from "@/types/index";
 
 interface EditUserModalProps {
   open: boolean;
@@ -57,11 +44,8 @@ export function EditUserModal({
               id: user.id,
               name: formData.get("name") as string,
               email: formData.get("email") as string,
+              password: formData.get("password") as string,
               lastActive: user.lastActive,
-            });
-            toast({
-              title: "User updated",
-              description: "The user has been updated successfully.",
             });
           }}
         >
@@ -89,6 +73,19 @@ export function EditUserModal({
                 className="col-span-3"
                 defaultValue={user.email}
                 required
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit-password" className="text-right">
+                Password
+              </Label>
+              <Input
+                id="edit-password"
+                name="password"
+                type="password"
+                className="col-span-3"
+                required
+                minLength={6}
               />
             </div>
           </div>

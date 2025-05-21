@@ -1,6 +1,11 @@
 "use client";
 
-import { getSalesData, getTopProducts, useStore } from "@/store/store";
+import {
+  getSalesData,
+  getTopProducts,
+  useStore,
+  useSettingsStore,
+} from "@/store/store";
 import {
   Card,
   CardContent,
@@ -22,6 +27,7 @@ import { cn } from "@/lib/utils";
 import dynamic from "next/dynamic";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useEffect, useState } from "react";
+import { toast } from "@/components/ui/use-toast";
 
 // Import charts with dynamic imports and disable SSR
 const LineChart = dynamic(() => import("@/components/charts/line-chart"), {
@@ -42,6 +48,8 @@ export default function Dashboard() {
   const [ordersLoading, setOrdersLoading] = useState(true);
   const [productsLoading, setProductsLoading] = useState(true);
   const [discountsLoading, setDiscountsLoading] = useState(true);
+  const [settingsLoading, setSettingsLoading] = useState(true);
+  const { users, shippingOptions, fetchSettings } = useSettingsStore();
 
   useEffect(() => {
     const orders = useStore.getState().orders;
@@ -91,7 +99,27 @@ export default function Dashboard() {
     }
   }, []);
 
-  if (ordersLoading || productsLoading || discountsLoading) {
+  useEffect(() => {
+    if (users.length === 0 || shippingOptions.length === 0) {
+      fetchSettings()
+        .then(() => {
+          setSettingsLoading(false);
+        })
+        .catch((error) => {
+          console.error("Fetch settings error:", error);
+          setSettingsLoading(false);
+          toast({
+            title: "Error",
+            description: "Failed to fetch settings. Please try again.",
+            variant: "destructive",
+          });
+        });
+    } else {
+      setSettingsLoading(false);
+    }
+  }, []);
+
+  if (ordersLoading || productsLoading || discountsLoading || settingsLoading) {
     return (
       <div className="flex-1 space-y-4 p-8 pt-6">
         <div className="flex items-center justify-between">

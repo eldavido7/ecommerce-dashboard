@@ -1,6 +1,6 @@
 import { create } from "zustand"
 import { persist } from "zustand/middleware";
-import type { Product, Order, Discount, AnalyticsOrder, OrderWithItems } from "@/types"
+import type { Product, Order, Discount, AnalyticsOrder, OrderWithItems, User, ShippingOption } from "@/types"
 
 interface StoreState {
   // Products
@@ -25,13 +25,6 @@ interface StoreState {
 }
 
 // Users
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  lastActive: string;
-}
-
 interface AuthStore {
   user: User | null;
   isLoading: boolean;
@@ -343,3 +336,102 @@ export const useAuthStore = create<AuthStore>()(
     }
   )
 );
+
+interface SettingsState {
+  users: User[];
+  shippingOptions: ShippingOption[];
+  fetchSettings: () => Promise<void>;
+  createUser: (user: Partial<User>) => Promise<void>;
+  updateUser: (user: Partial<User> & { id: string }) => Promise<void>;
+  deleteUser: (id: string) => Promise<void>;
+  createShipping: (option: Partial<ShippingOption>) => Promise<void>;
+  updateShipping: (option: Partial<ShippingOption> & { id: string }) => Promise<void>;
+  deleteShipping: (id: string) => Promise<void>;
+}
+
+export const useSettingsStore = create<SettingsState>((set) => ({
+  users: [],
+  shippingOptions: [],
+
+  fetchSettings: async () => {
+    const [usersRes, shippingRes] = await Promise.all([
+      fetch("/api/settings/users"),
+      fetch("/api/settings/shipping-options"),
+    ]);
+
+    const [users, shippingOptions] = await Promise.all([
+      usersRes.json(),
+      shippingRes.json(),
+    ]);
+
+    set({ users, shippingOptions });
+  },
+
+  createUser: async (user) => {
+    const payload = { name: user.name, email: user.email, password: user.password };
+    const res = await fetch("/api/settings/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(`Failed to create user: ${res.status} ${res.statusText} - ${JSON.stringify(errorData)}`);
+    }
+    const newUser = await res.json();
+    set((state) => ({ users: [...state.users, newUser] }));
+  },
+
+  updateUser: async (user) => {
+    await fetch(`/api/settings/users/${user.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(user),
+    });
+    set((state) => ({
+      users: state.users.map((u) => (u.id === user.id ? { ...u, ...user } : u)),
+    }));
+  },
+
+  deleteUser: async (id) => {
+    await fetch(`/api/settings/users/${id}`, { method: "DELETE" });
+    set((state) => ({
+      users: state.users.filter((u) => u.id !== id),
+    }));
+  },
+
+  createShipping: async (option) => {
+    const res = await fetch("/api/settings/shipping-options", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(option),
+    });
+    if (!res.ok) {
+      throw new Error(`Failed to create shipping option: ${res.status} ${res.statusText}`);
+    }
+    const newOption = await res.json();
+    set((state) => ({
+      shippingOptions: [...state.shippingOptions, newOption],
+    }));
+  },
+
+  updateShipping: async (option) => {
+    await fetch(`/api/settings/shipping-options/${option.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(option),
+    });
+    set((state) => ({
+      shippingOptions: state.shippingOptions.map((s) =>
+        s.id === option.id ? { ...s, ...option } : s
+      ),
+    }));
+  },
+
+  deleteShipping: async (id) => {
+    await fetch(`/api/settings/shipping-options/${id}`, { method: "DELETE" });
+    set((state) => ({
+      shippingOptions: state.shippingOptions.filter((s) => s.id !== id),
+    }));
+  },
+}));

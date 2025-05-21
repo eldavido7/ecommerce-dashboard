@@ -87,3 +87,18 @@ model User {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 }
+
+model ShippingOption {
+  id           String   @id @default(cuid())
+  name         String
+  price        Float
+  deliveryTime String
+  status       ShippingStatus @default(ACTIVE)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+enum ShippingStatus {
+  ACTIVE
+  CONDITIONAL
+}

@@ -1,6 +1,6 @@
-"use client"
+"use client";
 
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -8,26 +8,24 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { toast } from "@/components/ui/use-toast"
-
-interface User {
-  id: string
-  name: string
-  email: string
-  role?: string
-  lastActive: string
-}
+} from "@/components/ui/dialog";
+import { toast } from "@/components/ui/use-toast";
+import { User } from "@/types/index";
 
 interface DeleteUserModalProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  user: User | null
-  onDeleteUser: (userId: string) => void
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  user: User | null;
+  onDeleteUser: (userId: string) => void;
 }
 
-export function DeleteUserModal({ open, onOpenChange, user, onDeleteUser }: DeleteUserModalProps) {
-  if (!user) return null
+export function DeleteUserModal({
+  open,
+  onOpenChange,
+  user,
+  onDeleteUser,
+}: DeleteUserModalProps) {
+  if (!user) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -35,12 +33,14 @@ export function DeleteUserModal({ open, onOpenChange, user, onDeleteUser }: Dele
         <DialogHeader>
           <DialogTitle>Delete User</DialogTitle>
           <DialogDescription>
-            Are you sure you want to delete this user? This action cannot be undone.
+            Are you sure you want to delete this user? This action cannot be
+            undone.
           </DialogDescription>
         </DialogHeader>
         <div className="py-4">
           <p>
-            You are about to delete the user <strong>{user.name}</strong> with email <strong>{user.email}</strong>.
+            You are about to delete the user <strong>{user.name}</strong> with
+            email <strong>{user.email}</strong>.
           </p>
         </div>
         <DialogFooter>
@@ -50,12 +50,8 @@ export function DeleteUserModal({ open, onOpenChange, user, onDeleteUser }: Dele
           <Button
             variant="destructive"
             onClick={() => {
-              onDeleteUser(user.id)
-              onOpenChange(false)
-              toast({
-                title: "User deleted",
-                description: "The user has been deleted successfully.",
-              })
+              onDeleteUser(user.id);
+              onOpenChange(false);
             }}
           >
             Delete User
@@ -63,5 +59,5 @@ export function DeleteUserModal({ open, onOpenChange, user, onDeleteUser }: Dele
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  )
+  );
 }
