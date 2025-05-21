@@ -29,6 +29,7 @@ export async function POST(req: Request) {
                 name,
                 email,
                 password: hashedPassword,
+                lastActive: new Date().toISOString(),
             },
         });
 
@@ -37,3 +38,4 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Failed to create user." }, { status: 500 });
     }
 }
+

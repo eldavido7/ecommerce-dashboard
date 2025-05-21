@@ -308,6 +308,8 @@ export const useAuthStore = create<AuthStore>()(
 
           if (res.ok && data.success) {
             set({ user: data.user });
+            const { updateUserActivity } = useSettingsStore.getState();
+            await updateUserActivity(data.user.id); // Update lastActive on login
             return true;
           }
 
@@ -347,6 +349,7 @@ interface SettingsState {
   createShipping: (option: Partial<ShippingOption>) => Promise<void>;
   updateShipping: (option: Partial<ShippingOption> & { id: string }) => Promise<void>;
   deleteShipping: (id: string) => Promise<void>;
+  updateUserActivity: (userId: string) => Promise<void>; // New function
 }
 
 export const useSettingsStore = create<SettingsState>((set) => ({
@@ -390,6 +393,22 @@ export const useSettingsStore = create<SettingsState>((set) => ({
     });
     set((state) => ({
       users: state.users.map((u) => (u.id === user.id ? { ...u, ...user } : u)),
+    }));
+  },
+
+  updateUserActivity: async (userId) => {
+    const res = await fetch("/api/settings/users/activity", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId }),
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(`Failed to update activity: ${res.status} ${res.statusText} - ${JSON.stringify(errorData)}`);
+    }
+    const updatedUser = await res.json();
+    set((state) => ({
+      users: state.users.map((u) => (u.id === updatedUser.id ? updatedUser : u)),
     }));
   },
 

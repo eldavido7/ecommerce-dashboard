@@ -19,6 +19,7 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
                 name,
                 email,
                 password: hashedPassword,
+                lastActive: new Date().toISOString(),
             },
         });
 
