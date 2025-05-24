@@ -34,11 +34,11 @@ const routes = [
     icon: ShoppingCart,
     href: "/orders",
   },
-  {
-    label: "Discounts",
-    icon: Gift,
-    href: "/discounts",
-  },
+  // {
+  //   label: "Discounts",
+  //   icon: Gift,
+  //   href: "/discounts",
+  // },
   {
     label: "Inventory",
     icon: Tag,

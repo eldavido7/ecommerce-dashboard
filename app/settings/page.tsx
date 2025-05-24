@@ -55,7 +55,7 @@ import {
 
 export default function SettingsPage() {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState("shipping");
+  const [activeTab, setActiveTab] = useState("users");
 
   const [loading, setLoading] = useState(true);
 
@@ -99,7 +99,8 @@ export default function SettingsPage() {
   } = useSettingsStore();
 
   useEffect(() => {
-    if (users.length === 0 || shippingOptions.length === 0) {
+    // if (users.length === 0 || shippingOptions.length === 0) {
+    if (users.length === 0) {
       fetchSettings()
         .then(() => {
           setLoading(false);
@@ -277,13 +278,13 @@ export default function SettingsPage() {
         <h2 className="text-3xl font-bold tracking-tight">Settings</h2>
       </div>
 
-      <Tabs defaultValue="shipping" onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="shipping">Shipping</TabsTrigger>
+      <Tabs defaultValue="users" onValueChange={setActiveTab}>
+        <TabsList>
+          {/* <TabsTrigger value="shipping">Shipping</TabsTrigger> */}
           <TabsTrigger value="users">Users</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="shipping" className="space-y-4">
+        {/* <TabsContent value="shipping" className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle>Shipping Options</CardTitle>
@@ -392,7 +393,6 @@ export default function SettingsPage() {
             </AlertDialogContent>
           </AlertDialog>
 
-          {/* Shipping Modals */}
           <AddShippingOptionModal
             open={isAddShippingOpen}
             onOpenChange={setIsAddShippingOpen}
@@ -405,7 +405,7 @@ export default function SettingsPage() {
             shippingOption={currentShipping}
             onEditShippingOption={editShippingOption}
           />
-        </TabsContent>
+        </TabsContent> */}
 
         <TabsContent value="users" className="space-y-4">
           <Card>
