@@ -1,7 +1,6 @@
 "use client";
 
 import type React from "react";
-
 import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/sidebar";
 import { Header } from "@/components/header";
@@ -21,16 +20,17 @@ export function MainLayout({ children }: MainLayoutProps) {
 
   // Check if we're on the login page
   const isLoginPage = pathname === "/login";
+  const isStorePage = pathname.startsWith("/store");
 
-  // Redirect to login if not authenticated and not already on login page
+  // Redirect to login if not authenticated and not already on login or store page
   useEffect(() => {
-    if (!isLoading && !user && !isLoginPage) {
+    if (!isLoading && !user && !isLoginPage && !isStorePage) {
       router.push("/login");
     }
-  }, [user, isLoading, isLoginPage, router]);
+  }, [user, isLoading, isLoginPage, isStorePage, router]);
 
-  // If we're on the login page, don't wrap with the dashboard layout
-  if (isLoginPage) {
+  // If we're on the login or store page, don't wrap with the dashboard layout
+  if (isLoginPage || isStorePage) {
     return <>{children}</>;
   }
 
@@ -43,8 +43,8 @@ export function MainLayout({ children }: MainLayoutProps) {
     );
   }
 
-  // Don't render anything if not authenticated and not on login page
-  if (!user && !isLoginPage) {
+  // Don't render anything if not authenticated and not on login or store page
+  if (!user && !isLoginPage && !isStorePage) {
     return null;
   }
 

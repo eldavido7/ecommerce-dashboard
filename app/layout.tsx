@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
+import { CartProvider } from "@/contexts/cart-context";
 import { Toaster } from "@/components/toaster";
 import { MainLayout } from "@/components/main-layout";
 
@@ -26,7 +27,10 @@ export default function RootLayout({
           defaultTheme="light"
           enableSystem={false}
         >
-          <MainLayout>{children}</MainLayout>
+          <CartProvider>
+            <MainLayout>{children}</MainLayout>
+            <Toaster />
+          </CartProvider>
           <Toaster />
         </ThemeProvider>
       </body>
