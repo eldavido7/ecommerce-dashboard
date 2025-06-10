@@ -36,7 +36,7 @@ export function StoreHeader() {
             </Button>
           </Link>
           <Link
-            href="/dashboard"
+            href="/login"
             className="md:flex hidden text-sm font-medium transition-colors hover:text-green-600"
           >
             Admin
