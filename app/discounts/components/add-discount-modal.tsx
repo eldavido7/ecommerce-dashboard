@@ -39,7 +39,9 @@ export function AddDiscountModal({
 }: AddDiscountModalProps) {
   const { products } = useStore();
   const [productSearch, setProductSearch] = useState("");
-  const [newDiscount, setNewDiscount] = useState<Partial<Discount>>({
+  const [newDiscount, setNewDiscount] = useState<
+    Partial<Discount> & { productIds: string[] }
+  >({
     code: "",
     description: "",
     type: "percentage",
@@ -49,22 +51,29 @@ export function AddDiscountModal({
     startsAt: new Date(),
     endsAt: undefined,
     isActive: true,
-    conditions: {
-      minSubtotal: 0,
-      products: [],
-    },
+    minSubtotal: 0,
+    productIds: [], // ✅ replace conditions.products
   });
 
   const handleAddDiscount = () => {
     const discountToAdd = {
-      ...newDiscount,
       id: `disc_${Math.random().toString(36).substring(2, 10)}`,
+      code: newDiscount.code!,
+      description: newDiscount.description,
+      type: newDiscount.type!,
+      value: newDiscount.value!,
+      usageLimit: newDiscount.usageLimit,
       usageCount: 0,
+      startsAt: newDiscount.startsAt!,
+      endsAt: newDiscount.endsAt,
+      isActive: newDiscount.isActive!,
+      minSubtotal: newDiscount.minSubtotal || 0,
+      productIds: newDiscount.productIds || [],
       createdAt: new Date(),
       updatedAt: new Date(),
-    } as Discount;
+    };
 
-    onAddDiscount(discountToAdd);
+    onAddDiscount(discountToAdd as Discount);
     onOpenChange(false);
     setNewDiscount({
       code: "",
@@ -76,10 +85,8 @@ export function AddDiscountModal({
       startsAt: new Date(),
       endsAt: undefined,
       isActive: true,
-      conditions: {
-        minSubtotal: 0,
-        products: [],
-      },
+      minSubtotal: 0,
+      productIds: [],
     });
     setProductSearch("");
   };
@@ -93,27 +100,20 @@ export function AddDiscountModal({
     );
   }, [productSearch, products]);
 
-  const addProductToConditions = (productId: string) => {
-    if (!newDiscount.conditions?.products?.includes(productId)) {
+  const addProductToList = (productId: string) => {
+    if (!newDiscount.productIds?.includes(productId)) {
       setNewDiscount({
         ...newDiscount,
-        conditions: {
-          ...newDiscount.conditions!,
-          products: [...(newDiscount.conditions?.products || []), productId],
-        },
+        productIds: [...(newDiscount.productIds || []), productId],
       });
     }
   };
 
-  const removeProductFromConditions = (productId: string) => {
+  const removeProductFromList = (productId: string) => {
     setNewDiscount({
       ...newDiscount,
-      conditions: {
-        ...newDiscount.conditions!,
-        products:
-          newDiscount.conditions?.products?.filter((id) => id !== productId) ||
-          [],
-      },
+      productIds:
+        newDiscount.productIds?.filter((id) => id !== productId) || [],
     });
   };
 
@@ -277,7 +277,7 @@ export function AddDiscountModal({
                     <div
                       key={product.id}
                       className="cursor-pointer hover:bg-muted p-1 rounded text-sm"
-                      onClick={() => addProductToConditions(product.id)}
+                      onClick={() => addProductToList(product.id)}
                     >
                       {product.title} ({product.id})
                     </div>
@@ -285,14 +285,14 @@ export function AddDiscountModal({
                 </div>
               )}
               <div className="flex flex-wrap gap-2">
-                {newDiscount.conditions?.products?.map((productId) => {
+                {newDiscount.productIds.map((productId) => {
                   const product = products.find((p) => p.id === productId);
                   return (
                     <Badge key={productId} variant="secondary">
                       {product?.title || productId}
                       <X
                         className="ml-1 h-3 w-3 cursor-pointer"
-                        onClick={() => removeProductFromConditions(productId)}
+                        onClick={() => removeProductFromList(productId)}
                       />
                     </Badge>
                   );

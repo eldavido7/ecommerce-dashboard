@@ -100,7 +100,7 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    if (users.length === 0 || shippingOptions.length === 0) {
+    if (users.length === 0) {
       fetchSettings()
         .then(() => {
           setSettingsLoading(false);
@@ -164,18 +164,13 @@ export default function Dashboard() {
   const totalRevenue = orders
     .filter((order) => order.status === "DELIVERED")
     .reduce((sum, order) => {
-      const orderTotal = order.items.reduce(
-        (orderSum, item) => orderSum + item.subtotal,
-        0
-      );
+      const orderTotal = order.total; // Use the total directly
       return sum + orderTotal;
     }, 0);
   const totalOrders = orders.length;
   const totalProducts = products.length;
   // Count unique customers by email
-  const totalCustomers = new Set(
-    orders.map((order) => order.customerDetails.email)
-  ).size;
+  const totalCustomers = new Set(orders.map((order) => order.email)).size;
 
   // Calculate recent stats
   const pendingOrders = orders.filter(
@@ -211,8 +206,8 @@ export default function Dashboard() {
     { name: "Shipped", value: shippedOrders },
     { name: "Delivered", value: deliveredOrders },
     {
-      name: "Canceled",
-      value: orders.filter((order) => order.status === "CANCELED").length,
+      name: "Cancelled",
+      value: orders.filter((order) => order.status === "CANCELLED").length,
     },
   ].filter((item) => item.value > 0);
 
@@ -264,13 +259,13 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">₦{totalRevenue}</div>
-            <div className="flex items-center pt-1">
+            {/* <div className="flex items-center pt-1">
               <ArrowUpIcon className="mr-1 h-3 w-3 text-green-500" />
               <span className="text-xs text-green-500 font-medium">+20.1%</span>
               <span className="text-xs text-muted-foreground ml-1">
                 from last month
               </span>
-            </div>
+            </div> */}
           </CardContent>
         </Card>
 
@@ -281,13 +276,13 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{totalOrders}</div>
-            <div className="flex items-center pt-1">
+            {/* <div className="flex items-center pt-1">
               <ArrowUpIcon className="mr-1 h-3 w-3 text-green-500" />
               <span className="text-xs text-green-500 font-medium">+12.5%</span>
               <span className="text-xs text-muted-foreground ml-1">
                 from last month
               </span>
-            </div>
+            </div> */}
           </CardContent>
         </Card>
 
@@ -383,8 +378,7 @@ export default function Dashboard() {
                     >
                       <div className="space-y-1">
                         <p className="text-sm font-medium leading-none">
-                          {order.customerDetails.firstName}{" "}
-                          {order.customerDetails.lastName}
+                          {order.firstName} {order.lastName}
                         </p>
                         <div className="flex items-center text-sm text-muted-foreground gap-2">
                           <span>
@@ -392,12 +386,12 @@ export default function Dashboard() {
                             {order.items.length === 1 ? "item" : "items"}
                           </span>
                           <span>•</span>
-                          <span>
-                            ₦
-                            {order.items
-                              ?.reduce((sum, item) => sum + item.subtotal, 0)
-                              .toLocaleString()}
-                          </span>
+                          <span>₦{order.total.toLocaleString()}</span>
+                          {order.discount && (
+                            <span className="text-xs text-muted-foreground italic">
+                              Discount Applied ({order.discount.code})
+                            </span>
+                          )}
                         </div>
                       </div>
                       <Badge
@@ -410,7 +404,7 @@ export default function Dashboard() {
                             "bg-amber-100 text-amber-800 hover:bg-amber-100 dark:bg-amber-900 dark:text-amber-100",
                           order.status === "PENDING" &&
                             "bg-gray-100 text-gray-800 hover:bg-gray-100 dark:bg-gray-700 dark:text-gray-100",
-                          order.status === "CANCELED" &&
+                          order.status === "CANCELLED" &&
                             "bg-red-100 text-red-800 hover:bg-red-100 dark:bg-red-900 dark:text-red-100"
                         )}
                         variant="outline"

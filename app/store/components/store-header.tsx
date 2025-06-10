@@ -13,7 +13,7 @@ export function StoreHeader() {
 
   return (
     <header className="sticky top-0 z-40 w-full bg-white border-b shadow-sm">
-      <div className="container flex items-center justify-between h-16 px-4 mx-auto sm:px-6">
+      <div className="container flex items-center justify-between h-16 md:px-36 px-4 py-8">
         <div className="flex items-center">
           <Link href="/store" className="flex items-center space-x-2">
             <Leaf className="w-6 h-6 text-green-600" />

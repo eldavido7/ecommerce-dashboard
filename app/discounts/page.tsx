@@ -39,7 +39,6 @@ import { Card } from "@tremor/react";
 import { CardContent, CardHeader } from "@/components/ui/card";
 import { useShallow } from "zustand/react/shallow";
 import { toast } from "@/components/ui/use-toast";
-import { de } from "date-fns/locale";
 
 export default function DiscountsPage() {
   const {

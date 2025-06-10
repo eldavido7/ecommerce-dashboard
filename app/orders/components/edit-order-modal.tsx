@@ -20,10 +20,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, AlertCircle } from "lucide-react";
+import { Search, AlertCircle, Plus } from "lucide-react";
 import { useStore } from "@/store/store";
 import { toast } from "@/components/ui/use-toast";
-import type { Order, CustomerDetails, Address, OrderItem } from "@/types";
+import type { Order } from "@/types";
+import { useShallow } from "zustand/react/shallow";
 
 interface EditOrderModalProps {
   open: boolean;
@@ -38,56 +39,178 @@ export function EditOrderModal({
   order,
   onUpdateOrder,
 }: EditOrderModalProps) {
-  const { fetchOrders, products } = useStore();
+  const { products, discounts, fetchOrders, fetchProducts, fetchDiscounts } =
+    useStore(
+      useShallow((state) => ({
+        products: state.products,
+        discounts: state.discounts,
+        fetchOrders: state.fetchOrders,
+        fetchProducts: state.fetchProducts,
+        fetchDiscounts: state.fetchDiscounts,
+      }))
+    );
 
   // Form state
-  const [customerDetails, setCustomerDetails] = useState<CustomerDetails>({
-    firstName: "",
-    lastName: "",
-    email: "",
-    phone: "",
-  });
-  const [address, setAddress] = useState<Address>({
-    address: "",
-    city: "",
-    state: "",
-    postalCode: "",
-    country: "Nigeria",
-  });
-  const [status, setStatus] = useState<Order["status"] | undefined>(undefined);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
+  const [city, setCity] = useState("");
+  const [state, setState] = useState("");
+  const [postalCode, setPostalCode] = useState("");
+  const [country, setCountry] = useState("Nigeria");
+  const [status, setStatus] = useState<Order["status"] | null>(null);
   const [items, setItems] = useState<
-    { productId: string; quantity: number; title?: string }[]
+    { productId: string; quantity: number; title?: string; price?: number }[]
   >([]);
+  const [selectedDiscountId, setSelectedDiscountId] = useState<string | null>(
+    null
+  );
+  const [discountError, setDiscountError] = useState<string>("");
+  const [subtotal, setSubtotal] = useState(0);
+  const [total, setTotal] = useState(0);
+  const [discountAmount, setDiscountAmount] = useState(0);
   const [searchOpen, setSearchOpen] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<typeof products>([]);
 
   // Initialize form with order data
   useEffect(() => {
-    if (order) {
-      setCustomerDetails({
-        firstName: order.customerDetails.firstName,
-        lastName: order.customerDetails.lastName,
-        email: order.customerDetails.email,
-        phone: order.customerDetails.phone,
-      });
-      setAddress({
-        address: order.address.address,
-        city: order.address.city,
-        state: order.address.state,
-        postalCode: order.address.postalCode,
-        country: order.address.country,
-      });
+    if (order?.id) {
+      setFirstName(order.firstName);
+      setLastName(order.lastName);
+      setEmail(order.email);
+      setPhone(order.phone);
+      setAddress(order.address);
+      setCity(order.city);
+      setState(order.state);
+      setPostalCode(order.postalCode);
+      setCountry(order.country);
       setStatus(order.status);
+      setSelectedDiscountId(order.discountId || null);
       setItems(
-        order.items.map((item) => ({
-          productId: item.productId,
-          quantity: item.quantity,
-          title: products.find((p) => p.id === item.productId)?.title || "",
-        }))
+        order.items.map((item) => {
+          const product = products.find((p) => p.id === item.productId);
+          return {
+            productId: item.productId,
+            quantity: item.quantity,
+            title: product?.title || "",
+            price: product?.price || 0,
+          };
+        })
       );
+      setSubtotal(order.subtotal || 0);
+      setTotal(order.total || 0);
     }
   }, [order, products]);
+
+  // Fetch products and discounts if empty
+  useEffect(() => {
+    if (!products || products.length === 0) {
+      fetchProducts().catch((err) => {
+        console.error("[FETCH_PRODUCTS]", err);
+        toast({
+          title: "Error",
+          description: "Failed to fetch products.",
+          variant: "destructive",
+        });
+      });
+    }
+    if (!discounts || discounts.length === 0) {
+      fetchDiscounts().catch((err) => {
+        console.error("[FETCH_DISCOUNTS]", err);
+        toast({
+          title: "Error",
+          description: "Failed to fetch discounts.",
+          variant: "destructive",
+        });
+      });
+    }
+  }, [products, discounts, fetchProducts, fetchDiscounts]);
+
+  // Calculate totals and validate discount
+  const calculateTotals = async () => {
+    let calculatedSubtotal = 0;
+    let calculatedTotal = 0;
+    let calculatedDiscountAmount = 0;
+    let error = "";
+
+    try {
+      // Calculate subtotal
+      for (const item of items) {
+        if (item.productId) {
+          const product = products.find((p) => p.id === item.productId);
+          if (product) {
+            calculatedSubtotal += product.price * item.quantity;
+          }
+        }
+      }
+
+      calculatedTotal = calculatedSubtotal;
+
+      // Validate discount
+      if (selectedDiscountId) {
+        const discount = discounts.find((d) => d.id === selectedDiscountId);
+        if (!discount) {
+          error = "Selected discount is invalid.";
+        } else if (!discount.isActive) {
+          error = `Discount ${discount.code} is not active.`;
+        } else if (discount.startsAt > new Date()) {
+          error = `Discount ${discount.code} is not yet valid.`;
+        } else if (discount.endsAt && discount.endsAt < new Date()) {
+          error = `Discount ${discount.code} has expired.`;
+        } else if (
+          discount.usageLimit &&
+          discount.usageCount >= discount.usageLimit
+        ) {
+          error = `Discount ${discount.code} has reached its usage limit.`;
+        } else if (
+          discount.minSubtotal &&
+          calculatedSubtotal < discount.minSubtotal
+        ) {
+          error = `Order subtotal (₦${calculatedSubtotal.toFixed(
+            2
+          )}) is below the minimum required (₦${discount.minSubtotal.toFixed(
+            2
+          )}) for discount ${discount.code}.`;
+        } else if (
+          discount.products?.length &&
+          !items.some((item) =>
+            discount?.products?.some((p) => p.id === item.productId)
+          )
+        ) {
+          error = `Selected products do not qualify for discount ${discount.code}.`;
+        } else {
+          if (discount.type === "percentage") {
+            calculatedDiscountAmount =
+              (discount.value / 100) * calculatedSubtotal;
+          } else if (discount.type === "fixed_amount") {
+            calculatedDiscountAmount = discount.value;
+          } else if (discount.type === "free_shipping") {
+            calculatedDiscountAmount = 0; // Adjust if shipping costs are added
+          }
+          calculatedTotal = Math.max(
+            0,
+            calculatedSubtotal - calculatedDiscountAmount
+          );
+        }
+      }
+    } catch (err) {
+      error = "Failed to calculate totals.";
+      console.error("[CALCULATE_TOTALS]", err);
+    }
+
+    setSubtotal(calculatedSubtotal);
+    setTotal(calculatedTotal);
+    setDiscountAmount(calculatedDiscountAmount);
+    setDiscountError(error);
+  };
+
+  // Recalculate totals when items or discount change
+  useEffect(() => {
+    calculateTotals();
+  }, [items, selectedDiscountId, products, discounts]);
 
   // Handle search input change
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -127,6 +250,7 @@ export function EditOrderModal({
       ...updatedItems[index],
       productId: product.id,
       title: product.title,
+      price: product.price,
     };
     setItems(updatedItems);
   };
@@ -134,6 +258,17 @@ export function EditOrderModal({
   // Handle quantity change
   const handleQuantityChange = (index: number, quantity: number) => {
     const updatedItems = [...items];
+    const product = products.find(
+      (p) => p.id === updatedItems[index].productId
+    );
+    if (product && quantity > product.inventory) {
+      toast({
+        title: "Invalid Quantity",
+        description: `Quantity cannot exceed available inventory (${product.inventory}) for ${product.title}.`,
+        variant: "destructive",
+      });
+      return;
+    }
     updatedItems[index] = {
       ...updatedItems[index],
       quantity: Math.max(1, quantity),
@@ -149,6 +284,7 @@ export function EditOrderModal({
         productId: "",
         quantity: 1,
         title: "",
+        price: 0,
       },
     ]);
   };
@@ -164,13 +300,8 @@ export function EditOrderModal({
   const handleUpdateOrder = async () => {
     if (!order?.id) return;
 
-    // Validate customer details
-    if (
-      !customerDetails.firstName ||
-      !customerDetails.lastName ||
-      !customerDetails.email ||
-      !customerDetails.phone
-    ) {
+    // Validate fields
+    if (!firstName || !lastName || !email || !phone) {
       toast({
         title: "Missing Customer Information",
         description: "Please fill in all customer details",
@@ -179,8 +310,7 @@ export function EditOrderModal({
       return;
     }
 
-    // Validate address
-    if (!address.address || !address.city || !address.postalCode) {
+    if (!address || !city || !postalCode || !country) {
       toast({
         title: "Missing Address Information",
         description: "Please fill in all required address details",
@@ -189,7 +319,6 @@ export function EditOrderModal({
       return;
     }
 
-    // Validate items
     if (items.length === 0 || items.some((item) => !item.productId)) {
       toast({
         title: "Invalid Order Items",
@@ -199,28 +328,40 @@ export function EditOrderModal({
       return;
     }
 
-    // Construct payload with changed fields
+    if (discountError) {
+      toast({
+        title: "Invalid Discount",
+        description: discountError,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Construct payload
     const payload: Partial<Order> = {
-      firstName: customerDetails.firstName,
-      lastName: customerDetails.lastName,
-      email: customerDetails.email,
-      phone: customerDetails.phone,
-      address: address.address,
-      city: address.city,
-      state: address.state,
-      postalCode: address.postalCode,
-      country: address.country,
-      status,
+      firstName,
+      lastName,
+      email,
+      phone,
+      address,
+      city,
+      state,
+      postalCode,
+      country,
+      status: status || "PENDING",
       items: items.map((item) => ({
         productId: item.productId,
         quantity: item.quantity,
       })),
+      subtotal,
+      total,
+      discountId: selectedDiscountId || null,
     };
 
     try {
       await onUpdateOrder(order.id, payload);
-      await fetchOrders(); // Refresh orders
-      onOpenChange(false); // Close modal
+      await fetchOrders();
+      onOpenChange(false);
       toast({
         title: "Order Updated",
         description: `Order #${order.id} has been updated successfully`,
@@ -241,8 +382,8 @@ export function EditOrderModal({
         <DialogHeader>
           <DialogTitle>Edit Order #{order.id}</DialogTitle>
           <DialogDescription>
-            Update customer details, shipping information, status, and products
-            for this order
+            Update customer details, shipping information, status, products, and
+            discount for this order
           </DialogDescription>
         </DialogHeader>
 
@@ -255,13 +396,8 @@ export function EditOrderModal({
                 <Label htmlFor="firstName">First Name</Label>
                 <Input
                   id="firstName"
-                  value={customerDetails.firstName}
-                  onChange={(e) =>
-                    setCustomerDetails({
-                      ...customerDetails,
-                      firstName: e.target.value,
-                    })
-                  }
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
                   required
                 />
               </div>
@@ -269,13 +405,8 @@ export function EditOrderModal({
                 <Label htmlFor="lastName">Last Name</Label>
                 <Input
                   id="lastName"
-                  value={customerDetails.lastName}
-                  onChange={(e) =>
-                    setCustomerDetails({
-                      ...customerDetails,
-                      lastName: e.target.value,
-                    })
-                  }
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
                   required
                 />
               </div>
@@ -286,13 +417,8 @@ export function EditOrderModal({
                 <Input
                   id="email"
                   type="email"
-                  value={customerDetails.email}
-                  onChange={(e) =>
-                    setCustomerDetails({
-                      ...customerDetails,
-                      email: e.target.value,
-                    })
-                  }
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   required
                 />
               </div>
@@ -300,13 +426,8 @@ export function EditOrderModal({
                 <Label htmlFor="phone">Phone</Label>
                 <Input
                   id="phone"
-                  value={customerDetails.phone}
-                  onChange={(e) =>
-                    setCustomerDetails({
-                      ...customerDetails,
-                      phone: e.target.value,
-                    })
-                  }
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
                   required
                 />
               </div>
@@ -321,13 +442,8 @@ export function EditOrderModal({
                 <Label htmlFor="address">Address</Label>
                 <Input
                   id="address"
-                  value={address.address}
-                  onChange={(e) =>
-                    setAddress({
-                      ...address,
-                      address: e.target.value,
-                    })
-                  }
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
                   required
                 />
               </div>
@@ -336,13 +452,8 @@ export function EditOrderModal({
                   <Label htmlFor="city">City</Label>
                   <Input
                     id="city"
-                    value={address.city}
-                    onChange={(e) =>
-                      setAddress({
-                        ...address,
-                        city: e.target.value,
-                      })
-                    }
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
                     required
                   />
                 </div>
@@ -350,13 +461,8 @@ export function EditOrderModal({
                   <Label htmlFor="state">State</Label>
                   <Input
                     id="state"
-                    value={address.state}
-                    onChange={(e) =>
-                      setAddress({
-                        ...address,
-                        state: e.target.value,
-                      })
-                    }
+                    value={state}
+                    onChange={(e) => setState(e.target.value)}
                   />
                 </div>
               </div>
@@ -365,13 +471,8 @@ export function EditOrderModal({
                   <Label htmlFor="postalCode">Postal Code</Label>
                   <Input
                     id="postalCode"
-                    value={address.postalCode}
-                    onChange={(e) =>
-                      setAddress({
-                        ...address,
-                        postalCode: e.target.value,
-                      })
-                    }
+                    value={postalCode}
+                    onChange={(e) => setPostalCode(e.target.value)}
                     required
                   />
                 </div>
@@ -379,13 +480,8 @@ export function EditOrderModal({
                   <Label htmlFor="country">Country</Label>
                   <Input
                     id="country"
-                    value={address.country}
-                    onChange={(e) =>
-                      setAddress({
-                        ...address,
-                        country: e.target.value,
-                      })
-                    }
+                    value={country}
+                    onChange={(e) => setCountry(e.target.value)}
                     required
                   />
                 </div>
@@ -397,7 +493,7 @@ export function EditOrderModal({
           <div className="grid gap-2">
             <h3 className="text-lg font-medium">Order Status</h3>
             <Select
-              value={status}
+              value={status || ""}
               onValueChange={(value) => setStatus(value as Order["status"])}
             >
               <SelectTrigger>
@@ -413,6 +509,46 @@ export function EditOrderModal({
             </Select>
           </div>
 
+          {/* Discount */}
+          <div className="grid gap-2">
+            <h3 className="text-lg font-medium">Discount</h3>
+            <div className="grid gap-2">
+              <Label htmlFor="discount">Discount</Label>
+              <Select
+                value={selectedDiscountId || "none"}
+                onValueChange={(value) =>
+                  setSelectedDiscountId(value === "none" ? null : value)
+                }
+              >
+                <SelectTrigger id="discount">
+                  <SelectValue placeholder="Select a discount (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No Discount</SelectItem>
+                  {discounts.map((discount) => (
+                    <SelectItem key={discount.id} value={discount.id}>
+                      {discount.code} -{" "}
+                      {discount.type === "percentage"
+                        ? `${discount.value}%`
+                        : discount.type === "fixed_amount"
+                        ? `₦${discount.value.toFixed(2)}`
+                        : "Free Shipping"}{" "}
+                      {discount.minSubtotal
+                        ? `(Min: ₦${discount.minSubtotal.toFixed(2)})`
+                        : ""}{" "}
+                      {discount.products?.length
+                        ? `(${discount.products.length} products)`
+                        : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {discountError && (
+                <p className="text-sm text-red-600">{discountError}</p>
+              )}
+            </div>
+          </div>
+
           {/* Order Items */}
           <div className="grid gap-2">
             <div className="flex items-center justify-between">
@@ -423,7 +559,7 @@ export function EditOrderModal({
                 size="sm"
                 onClick={addOrderItem}
               >
-                Add Product
+                <Plus className="mr-1 h-3 w-3" /> Add Product
               </Button>
             </div>
             {items.length === 0 ? (
@@ -511,6 +647,13 @@ export function EditOrderModal({
                         />
                       </div>
                     </div>
+                    {item.productId && item.price && (
+                      <div className="text-sm text-muted-foreground">
+                        {item.quantity} × {item.title} at ₦
+                        {item.price.toFixed(2)} = ₦
+                        {(item.price * item.quantity).toFixed(2)}
+                      </div>
+                    )}
                     <div className="flex justify-end">
                       <Button
                         type="button"
@@ -523,6 +666,13 @@ export function EditOrderModal({
                     </div>
                   </div>
                 ))}
+                <div className="flex justify-end gap-4 text-sm font-medium">
+                  <div>Subtotal: ₦{subtotal.toFixed(2)}</div>
+                  {discountAmount > 0 && (
+                    <div>Discount: ₦{discountAmount.toFixed(2)}</div>
+                  )}
+                  <div>Total: ₦{total.toFixed(2)}</div>
+                </div>
               </div>
             )}
           </div>
@@ -532,7 +682,16 @@ export function EditOrderModal({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleUpdateOrder}>Update Order</Button>
+          <Button
+            onClick={handleUpdateOrder}
+            disabled={
+              !!discountError ||
+              items.length === 0 ||
+              items.some((item) => !item.productId)
+            }
+          >
+            Update Order
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

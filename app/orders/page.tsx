@@ -51,24 +51,19 @@ export default function OrdersPage() {
   const [createOrderOpen, setCreateOrderOpen] = useState(false);
   const [editOrderOpen, setEditOrderOpen] = useState(false);
   const [viewOrderOpen, setViewOrderOpen] = useState(false);
-  const [confirmStatusOpen, setConfirmStatusOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [newStatus, setNewStatus] = useState<string>("");
   const [loading, setLoading] = useState(true);
 
   // Filter orders based on search query and status filter
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
-      const customer = order.customerDetails;
       const matchesSearch =
         searchQuery === "" ||
         order.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (customer &&
-          `${customer.firstName} ${customer.lastName}`
-            .toLowerCase()
-            .includes(searchQuery.toLowerCase())) ||
-        (customer &&
-          customer.email.toLowerCase().includes(searchQuery.toLowerCase()));
+        `${order.firstName} ${order.lastName}`
+          .toLowerCase()
+          .includes(searchQuery.toLowerCase()) ||
+        order.email.toLowerCase().includes(searchQuery.toLowerCase());
 
       const matchesStatus =
         statusFilter === null || order.status === statusFilter;
@@ -152,16 +147,19 @@ export default function OrdersPage() {
     if (!orderToUpdate) return;
 
     const payload = {
-      firstName: orderToUpdate.customerDetails.firstName,
-      lastName: orderToUpdate.customerDetails.lastName,
-      email: orderToUpdate.customerDetails.email,
-      phone: orderToUpdate.customerDetails.phone,
-      address: orderToUpdate.address.address,
-      city: orderToUpdate.address.city,
-      state: orderToUpdate.address.state,
-      postalCode: orderToUpdate.address.postalCode,
-      country: orderToUpdate.address.country,
+      firstName: orderToUpdate.firstName,
+      lastName: orderToUpdate.lastName,
+      email: orderToUpdate.email,
+      phone: orderToUpdate.phone,
+      address: orderToUpdate.address,
+      city: orderToUpdate.city,
+      state: orderToUpdate.state,
+      postalCode: orderToUpdate.postalCode,
+      country: orderToUpdate.country,
       status: newStatus,
+      subtotal: orderToUpdate.subtotal,
+      total: orderToUpdate.total,
+      discountId: orderToUpdate.discountId ?? null,
       items: orderToUpdate.items.map((item) => ({
         productId: item.productId,
         quantity: item.quantity,
@@ -207,13 +205,6 @@ export default function OrdersPage() {
         description: "Failed to update order status.",
       });
     }
-  };
-
-  // Open confirm status modal
-  const openConfirmStatus = (order: Order, status: string) => {
-    setSelectedOrder(order);
-    setNewStatus(status);
-    setConfirmStatusOpen(true);
   };
 
   // Get status badge color
@@ -326,21 +317,22 @@ export default function OrdersPage() {
                         {format(new Date(order.createdAt), "MMM d, yyyy")}
                       </TableCell>
                       <TableCell>
-                        {order.customerDetails
-                          ? `${order.customerDetails.firstName} ${order.customerDetails.lastName}`
-                          : "N/A"}
+                        {`${order.firstName} ${order.lastName}`}
                       </TableCell>
-
                       <TableCell>
                         <Badge className={getStatusColor(order.status)}>
                           {order.status}
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        ₦
-                        {order.items
-                          ?.reduce((sum, item) => sum + item.subtotal, 0)
-                          .toLocaleString()}
+                        <div>
+                          <div>₦{order.total.toLocaleString()}</div>
+                          {order.discount && (
+                            <span className="text-xs text-muted-foreground italic">
+                              Discount Applied ({order.discount.code})
+                            </span>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
@@ -359,7 +351,7 @@ export default function OrdersPage() {
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               onClick={() => handleEditOrder(order)}
-                              disabled={order.status === "DELIVERED"} // Disable if status is DELIVERED
+                              disabled={order.status === "DELIVERED"}
                             >
                               Edit Order
                             </DropdownMenuItem>

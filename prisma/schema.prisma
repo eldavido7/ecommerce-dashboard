@@ -19,7 +19,8 @@ model Product {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @default(now()) @updatedAt
   orderItems  OrderItem[]
-  quantity    Int         @default(0) // 🆕 inventory stock
+  quantity    Int         @default(0) // inventory stock
+  discounts     Discount[]   @relation("ProductDiscounts")
 }
 
 enum OrderStatus {
@@ -27,23 +28,28 @@ enum OrderStatus {
   PROCESSING
   SHIPPED
   DELIVERED
+  CANCELLED
 }
 
 model Order {
-  id              String       @id @default(uuid())
-  firstName       String
-  lastName        String
-  email           String
-  phone           String
-  address         String
-  city            String
-  state           String
-  postalCode      String
-  country         String
-  status          OrderStatus  @default(PENDING) // 🆕
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @default(now()) @updatedAt
-  items           OrderItem[]
+  id           String       @id @default(uuid())
+  firstName    String
+  lastName     String
+  email        String
+  phone        String
+  address      String
+  city         String
+  state        String
+  postalCode   String
+  country      String
+  status       OrderStatus  @default(PENDING)
+  subtotal     Float        @default(0) // Sum of OrderItem.subtotal
+  total        Float        @default(0) // Final total after discount
+  discountId   String?
+  discount     Discount?    @relation(fields: [discountId], references: [id])
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @default(now()) @updatedAt
+  items        OrderItem[]
 }
 
 model OrderItem {
@@ -53,7 +59,7 @@ model OrderItem {
   product   Product  @relation(fields: [productId], references: [id])
   productId String
   quantity  Int
-  subtotal  Float    // 🆕 calculated per item
+  subtotal  Float    // product.price * quantity
 }
 
 model Discount {
@@ -67,6 +73,9 @@ model Discount {
   startsAt     DateTime
   endsAt       DateTime?
   isActive     Boolean
+  minSubtotal   Float?   // optional condition
+  products      Product[] @relation("ProductDiscounts") // for product-specific discounts
+  orders        Order[]   // Orders this discount has been applied to
   conditions   Json?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt

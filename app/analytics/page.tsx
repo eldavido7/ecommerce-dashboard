@@ -118,10 +118,7 @@ export default function AnalyticsPage() {
   const totalRevenue = orders
     .filter((order) => order.status === "DELIVERED")
     .reduce((sum, order) => {
-      const orderTotal = order.items.reduce(
-        (orderSum, item) => orderSum + item.subtotal,
-        0
-      );
+      const orderTotal = order.total; // Use the total directly
       return sum + orderTotal;
     }, 0);
 
@@ -161,7 +158,7 @@ export default function AnalyticsPage() {
     { name: "Delivered", value: deliveredOrders },
     {
       name: "Canceled",
-      value: orders.filter((order) => order.status === "CANCELED").length,
+      value: orders.filter((order) => order.status === "CANCELLED").length,
     },
   ].filter((item) => item.value > 0);
 
@@ -239,9 +236,9 @@ export default function AnalyticsPage() {
                 <div className="text-2xl font-bold">
                   ₦{totalRevenue.toFixed(2)}
                 </div>
-                <p className="text-xs text-muted-foreground">
+                {/* <p className="text-xs text-muted-foreground">
                   +20.1% from previous period
-                </p>
+                </p> */}
               </CardContent>
             </Card>
 
@@ -252,9 +249,9 @@ export default function AnalyticsPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{totalOrders}</div>
-                <p className="text-xs text-muted-foreground">
+                {/* <p className="text-xs text-muted-foreground">
                   +12.5% from previous period
-                </p>
+                </p> */}
               </CardContent>
             </Card>
 
@@ -269,9 +266,9 @@ export default function AnalyticsPage() {
                 <div className="text-2xl font-bold">
                   ₦{averageOrderValue.toFixed(2)}
                 </div>
-                <p className="text-xs text-muted-foreground">
+                {/* <p className="text-xs text-muted-foreground">
                   +2.5% from previous period
-                </p>
+                </p> */}
               </CardContent>
             </Card>
             <Card>

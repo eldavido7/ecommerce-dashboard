@@ -13,7 +13,7 @@ interface StoreState {
   // Orders
   orders: Order[];
   fetchOrders: () => Promise<void>;
-  addOrder: (order: Omit<Order, "id" | "createdAt" | "updatedAt">) => Promise<void>;
+  addOrder: (order: Omit<Order, "id" | "createdAt" | "updatedAt" | "subtotal" | "total"> & { items: { productId: string; quantity: number }[] }) => Promise<void>;
   updateOrder: (id: string, order: Partial<Order>) => Promise<void>;
 
   // Discounts
@@ -33,7 +33,7 @@ interface AuthStore {
   setUser: (user: User | null) => void;
 }
 
-export const useStore = create<StoreState>((set) => ({
+export const useStore = create<StoreState>((set, get) => ({
   // Products
   products: [],
 
@@ -91,64 +91,163 @@ export const useStore = create<StoreState>((set) => ({
     try {
       const res = await fetch("/api/orders");
       if (!res.ok) throw new Error("Failed to fetch orders");
-      const rawOrders = await res.json();
-
-      const ordersWithItems = await Promise.all(
-        rawOrders.map(async (order: any) => {
-          const itemsRes = await fetch(`/api/orders/${order.id}`);
-          const orderItems = itemsRes.ok ? await itemsRes.json() : [];
-
-          return {
-            id: order.id,
-            createdAt: order.createdAt,
-            status: order.status,
-            customerDetails: {
-              firstName: order.firstName,
-              lastName: order.lastName,
-              email: order.email,
-              phone: order.phone,
-            },
-            address: {
-              address: order.address,
-              city: order.city,
-              state: order.state,
-              postalCode: order.postalCode,
-              country: order.country,
-            },
-            items: orderItems.items ?? [], // ✅ get only the nested items array
-          };
-        })
-      );
-
-      set({ orders: ordersWithItems });
+      const orders: Order[] = await res.json();
+      set({ orders });
     } catch (error) {
       console.error("[FETCH_ORDERS]", error);
     }
   },
 
   addOrder: async (order) => {
-    const res = await fetch("/api/orders", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(order),
-    });
+    try {
+      const { products, discounts } = get(); // Access products and discounts from the state
 
-    if (!res.ok) throw new Error("Failed to create order");
-    const newOrder = await res.json();
-    set((state) => ({ orders: [newOrder, ...state.orders] }));
+      // Calculate subtotal from items
+      const itemsWithSubtotal = order.items.map((item) => {
+        const product = products.find((p) => p.id === item.productId);
+        if (!product) throw new Error(`Product ${item.productId} not found in state`);
+        return {
+          productId: item.productId,
+          product,
+          quantity: item.quantity,
+          subtotal: product.price * item.quantity,
+        };
+      });
+
+      const subtotal = itemsWithSubtotal.reduce((sum, item) => sum + item.subtotal, 0);
+      let total = subtotal;
+      let discount: Discount | null = null;
+
+      // Validate and apply discount
+      if (order.discountId) {
+        discount = discounts.find((d) => d.id === order.discountId) || null;
+        if (!discount) throw new Error("Invalid discount");
+
+        // Check discount constraints
+        if (
+          !discount.isActive ||
+          (discount.usageLimit && discount.usageCount >= discount.usageLimit) ||
+          (discount.startsAt && new Date(discount.startsAt) > new Date()) || // Fix comparison
+          (discount.endsAt && new Date(discount.endsAt) < new Date()) || // Fix comparison
+          (discount.minSubtotal && subtotal < discount.minSubtotal) ||
+          (discount.products?.length && !itemsWithSubtotal.some((item) =>
+            discount.products.some((p) => p.id === item.productId)
+          ))
+        ) {
+          throw new Error("Discount is not applicable");
+        }
+
+        // Apply discount
+        if (discount.type === "percentage") {
+          total = subtotal * (1 - discount.value / 100);
+        } else if (discount.type === "fixed_amount") {
+          total = Math.max(0, subtotal - discount.value);
+        } else if (discount.type === "free_shipping") {
+          total = subtotal;
+        }
+      }
+
+      const newOrder = {
+        ...order,
+        items: itemsWithSubtotal,
+        subtotal,
+        total,
+        discount,
+      };
+
+      const res = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newOrder),
+      });
+
+      if (!res.ok) throw new Error("Failed to create order");
+      const createdOrder = await res.json();
+      set((state) => ({ orders: [createdOrder, ...state.orders] }));
+    } catch (error) {
+      console.error("[ADD_ORDER]", error);
+      throw error;
+    }
   },
 
   updateOrder: async (id, updatedOrder) => {
-    await fetch(`/api/orders/${id}`, {
-      method: "PATCH",
-      body: JSON.stringify(updatedOrder),
-      headers: { "Content-Type": "application/json" },
-    });
-    set((state) => ({
-      orders: state.orders.map((o) =>
-        o.id === id ? { ...o, ...updatedOrder } : o
-      ),
-    }));
+    try {
+      const { products, discounts } = get(); // Access products and discounts from the state
+
+      let subtotal = updatedOrder.subtotal;
+      let total = updatedOrder.total;
+      let discount: Discount | null = updatedOrder.discount || null;
+
+      // Recalculate subtotal if items change
+      if (updatedOrder.items) {
+        const itemsWithSubtotal = updatedOrder.items.map((item) => {
+          const product = products.find((p) => p.id === item.productId);
+          if (!product) throw new Error(`Product ${item.productId} not found in state`);
+          return {
+            ...item,
+            product,
+            subtotal: product.price * item.quantity,
+          };
+        });
+        subtotal = itemsWithSubtotal.reduce((sum, item) => sum + item.subtotal, 0);
+        total = subtotal;
+        updatedOrder.items = itemsWithSubtotal;
+      }
+
+      // Validate and apply discount if discountId changes
+      if (updatedOrder.discountId) {
+        discount = discounts.find((d) => d.id === updatedOrder.discountId) ?? null;
+        if (!discount) throw new Error("Invalid discount");
+
+        if (
+          !discount.isActive ||
+          (discount.usageLimit && discount.usageCount >= discount.usageLimit) ||
+          (discount.startsAt && new Date() < new Date(discount.startsAt)) ||
+          (discount.endsAt && new Date() > new Date(discount.endsAt)) ||
+          (discount.minSubtotal && subtotal! < discount.minSubtotal) ||
+          (discount.products?.length && !updatedOrder.items?.some((item) =>
+            discount?.products?.some((p) => p.id === item.productId)
+          ))
+        ) {
+          throw new Error("Discount is not applicable");
+        }
+
+        if (discount.type === "percentage") {
+          total = subtotal! * (1 - discount.value / 100);
+        } else if (discount.type === "fixed_amount") {
+          total = Math.max(0, subtotal! - discount.value);
+        } else if (discount.type === "free_shipping") {
+          total = subtotal!;
+        }
+      } else if (updatedOrder.discountId === null) {
+        total = subtotal!;
+        discount = null;
+      }
+
+      const updated = {
+        ...updatedOrder,
+        subtotal,
+        total,
+        discount,
+      };
+
+      const res = await fetch(`/api/orders/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updated),
+      });
+
+      if (!res.ok) throw new Error("Failed to update order");
+      const updatedOrderResponse = await res.json();
+      set((state) => ({
+        orders: state.orders.map((o) =>
+          o.id === id ? { ...o, ...updatedOrderResponse } : o
+        ),
+      }));
+    } catch (error) {
+      console.error("[UPDATE_ORDER]", error);
+      throw error;
+    }
   },
 
   // Discounts
@@ -234,7 +333,9 @@ export function getTopProducts(orders: OrderWithItems[]) {
       }
 
       productStats[id].totalSold += item.quantity;
-      productStats[id].totalRevenue += item.subtotal;
+      productStats[id].totalRevenue +=
+        (item.quantity / order.items.reduce((sum, i) => sum + i.quantity, 0)) *
+        order.total; // Proportionally distribute the order's total
     });
   });
 
@@ -251,7 +352,7 @@ export function getTopProducts(orders: OrderWithItems[]) {
     topByRevenue,
     topByQuantity,
   };
-};
+}
 
 export function getSalesData(orders: AnalyticsOrder[]) {
   const revenueByMonth: Record<string, number> = {};
@@ -272,11 +373,7 @@ export function getSalesData(orders: AnalyticsOrder[]) {
       if (!revenueByMonth[month]) {
         revenueByMonth[month] = 0;
       }
-      const orderRevenue = order.items.reduce(
-        (sum, item) => sum + item.subtotal,
-        0
-      );
-      revenueByMonth[month] += orderRevenue;
+      revenueByMonth[month] += order.total; // Use total instead of subtotal
     }
   });
 
@@ -286,7 +383,7 @@ export function getSalesData(orders: AnalyticsOrder[]) {
     revenue: revenueByMonth[month] || 0,
     orderCount: orderCountByMonth[month],
   }));
-};
+}
 
 export const useAuthStore = create<AuthStore>()(
   persist(

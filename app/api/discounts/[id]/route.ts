@@ -7,7 +7,10 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
         const { id } = await params; // Await the params object
 
         const discount = await prisma.discount.findUnique({
-            where: { id }
+            where: { id },
+            include: {
+                products: true, // 👈 include related products
+            },
         });
         if (!discount) {
             return NextResponse.json({ error: "Discount not found" }, { status: 404 });
@@ -21,9 +24,9 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
 // UPDATE a discount
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
     try {
-        const { id } = await params; // Await the params object
-
+        const { id } = await params;
         const body = await req.json();
+
         const {
             code,
             description,
@@ -33,9 +36,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
             startsAt,
             endsAt,
             isActive,
-            conditions
+            minSubtotal,
+            productIds,
         } = body;
 
+        // First, update the discount fields
         const updatedDiscount = await prisma.discount.update({
             where: { id },
             data: {
@@ -47,12 +52,21 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
                 startsAt: new Date(startsAt),
                 endsAt: endsAt ? new Date(endsAt) : undefined,
                 isActive,
-                conditions
-            }
+                minSubtotal,
+                products: productIds
+                    ? {
+                        set: productIds.map((pid: string) => ({ id: pid })), // overwrite existing links
+                    }
+                    : undefined,
+            },
+            include: {
+                products: true,
+            },
         });
 
         return NextResponse.json(updatedDiscount);
     } catch (error) {
+        console.error("[DISCOUNT_PATCH]", error);
         return NextResponse.json({ error: "Failed to update discount" }, { status: 500 });
     }
 }

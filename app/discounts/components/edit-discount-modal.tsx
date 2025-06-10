@@ -41,20 +41,30 @@ export function EditDiscountModal({
 }: EditDiscountModalProps) {
   const { products } = useStore();
   const [productSearch, setProductSearch] = useState("");
-  const [editDiscount, setEditDiscount] = useState<Discount | null>(null);
+  const [editDiscount, setEditDiscount] = useState<
+    (Discount & { productIds: string[] }) | null
+  >(null);
 
   useEffect(() => {
     if (discount) {
-      setEditDiscount({ ...discount });
+      setEditDiscount({
+        ...discount,
+        productIds: discount.products?.map((p) => p.id) || [],
+      });
     }
   }, [discount]);
 
   const handleSaveChanges = () => {
     if (!editDiscount) return;
+
     const updatedDiscount: Discount = {
       ...editDiscount,
       updatedAt: new Date(),
+      conditions: {
+        products: editDiscount.productIds, // ← this line ensures productIds are saved
+      },
     };
+
     onUpdateDiscount(updatedDiscount);
     onOpenChange(false);
     setEditDiscount(null);
@@ -70,31 +80,21 @@ export function EditDiscountModal({
     );
   }, [productSearch, products]);
 
-  const addProductToConditions = (productId: string) => {
-    if (
-      editDiscount &&
-      !editDiscount.conditions?.products?.includes(productId)
-    ) {
+  const addProductToList = (productId: string) => {
+    if (!editDiscount) return;
+    if (!editDiscount.productIds.includes(productId)) {
       setEditDiscount({
         ...editDiscount,
-        conditions: {
-          ...editDiscount.conditions!,
-          products: [...(editDiscount.conditions?.products || []), productId],
-        },
+        productIds: [...editDiscount.productIds, productId],
       });
     }
   };
 
-  const removeProductFromConditions = (productId: string) => {
+  const removeProductFromList = (productId: string) => {
     if (!editDiscount) return;
     setEditDiscount({
       ...editDiscount,
-      conditions: {
-        ...editDiscount.conditions!,
-        products:
-          editDiscount.conditions?.products?.filter((id) => id !== productId) ||
-          [],
-      },
+      productIds: editDiscount.productIds.filter((id) => id !== productId),
     });
   };
 
@@ -242,7 +242,7 @@ export function EditDiscountModal({
                     <div
                       key={product.id}
                       className="cursor-pointer hover:bg-muted p-1 rounded text-sm"
-                      onClick={() => addProductToConditions(product.id)}
+                      onClick={() => addProductToList(product.id)}
                     >
                       {product.title} ({product.id})
                     </div>
@@ -250,14 +250,14 @@ export function EditDiscountModal({
                 </div>
               )}
               <div className="flex flex-wrap gap-2">
-                {editDiscount.conditions?.products?.map((productId) => {
+                {editDiscount.productIds.map((productId) => {
                   const product = products.find((p) => p.id === productId);
                   return (
                     <Badge key={productId} variant="secondary">
                       {product?.title || productId}
                       <X
                         className="ml-1 h-3 w-3 cursor-pointer"
-                        onClick={() => removeProductFromConditions(productId)}
+                        onClick={() => removeProductFromList(productId)}
                       />
                     </Badge>
                   );

@@ -5,8 +5,11 @@ import { prisma } from "@/lib/prisma"
 export async function GET() {
     try {
         const discounts = await prisma.discount.findMany({
-            orderBy: { createdAt: "desc" }
-        })
+            orderBy: { createdAt: "desc" },
+            include: {
+                products: true, // 👈 include related products
+            },
+        });
         return NextResponse.json(discounts)
     } catch (error) {
         return NextResponse.json({ error: "Failed to fetch discounts" }, { status: 500 })
@@ -26,8 +29,14 @@ export async function POST(req: Request) {
             startsAt,
             endsAt,
             isActive,
-            conditions
+            minSubtotal,
+            productIds, // array of strings
         } = body
+
+        // Validate required fields
+        if (!code || !type || !value || !startsAt || isActive === undefined) {
+            return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+        }
 
         const newDiscount = await prisma.discount.create({
             data: {
@@ -36,15 +45,22 @@ export async function POST(req: Request) {
                 type,
                 value,
                 usageLimit,
+                usageCount: 0, // initialize
                 startsAt: new Date(startsAt),
                 endsAt: endsAt ? new Date(endsAt) : undefined,
                 isActive,
-                conditions
+                minSubtotal,
+                products: productIds?.length
+                    ? {
+                        connect: productIds.map((id: string) => ({ id })),
+                    }
+                    : undefined,
             }
         })
 
-        return NextResponse.json(newDiscount)
+        return NextResponse.json(newDiscount, { status: 201 });
     } catch (error) {
+        console.error("[DISCOUNT_POST]", error);
         return NextResponse.json({ error: "Failed to create discount" }, { status: 500 })
     }
 }

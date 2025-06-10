@@ -15,6 +15,7 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     }
   }, [user, isLoading, router]);
 
+  // Wait for the authentication state to resolve
   if (isLoading) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
@@ -23,9 +24,11 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!user) {
-    return null;
+  // Render children if the user is authenticated
+  if (user) {
+    return <>{children}</>;
   }
 
-  return <>{children}</>;
+  // Prevent rendering anything if the user is not authenticated
+  return null;
 }

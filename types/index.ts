@@ -13,27 +13,28 @@ export interface Product {
 }
 
 // Order Types
-export interface Address {
-  address: string;
-  city: string;
-  state: string;
-  postalCode: string;
-  country: string;
-}
+// export interface Address {
+//   address: string;
+//   city: string;
+//   state: string;
+//   postalCode: string;
+//   country: string;
+// }
 
-export interface CustomerDetails {
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string;
-}
+// export interface CustomerDetails {
+//   firstName: string;
+//   lastName: string;
+//   email: string;
+//   phone: string;
+// }
 
 export interface OrderItem {
-  product: any
   id: string;
   productId: string;
+  product: Product;
   quantity: number;
-  subtotal: number;
+  subtotal: number; // product.price * quantity
+  total: number;
   orderId: string;
   createdAt: Date;
   updatedAt: Date;
@@ -41,31 +42,39 @@ export interface OrderItem {
 
 export interface Order {
   id: string;
-  customerDetails: CustomerDetails;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  address: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  country: string;
   items: OrderItem[];
-  status: "PENDING" | "PROCESSING" | "SHIPPED" | "DELIVERED" | "CANCELED";
-  total: number;
+  status: "PENDING" | "PROCESSING" | "SHIPPED" | "DELIVERED" | "CANCELLED";
+  subtotal: number; // Sum of OrderItem.subtotal
+  total: number; // Final total after discount
+  discountId?: string | null;
+  discount?: Discount | null;
   createdAt: Date;
   updatedAt: Date;
-  address: Address;
 }
 
 // Discount Types
 export interface Discount {
   id: string
   code: string
-  description?: string
+  description?: string | null;
   type: "percentage" | "fixed_amount" | "free_shipping"
   value: number
-  usageLimit?: number
+  usageLimit?: number | null
   usageCount: number
   startsAt: Date
-  endsAt?: Date
+  endsAt?: Date | null
+  minSubtotal?: number | null
+  products?: Product[]
   isActive: boolean
-  conditions?: {
-    minSubtotal?: number
-    products?: string[]
-  }
   createdAt: Date
   updatedAt: Date
 }
@@ -88,6 +97,7 @@ export type AnalyticsOrder = {
   createdAt: string;
   status: string;
   items: { subtotal: number }[];
+  total: number;
 };
 
 export type ProductItem = {
@@ -96,12 +106,13 @@ export type ProductItem = {
     title: string;
   };
   quantity: number;
-  subtotal: number;
+  total: number;
 };
 
 export type OrderWithItems = {
   status: string;
   items: ProductItem[];
+  total: number;
 };
 
 //User Types

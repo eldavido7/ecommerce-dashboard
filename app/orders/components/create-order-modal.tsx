@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/use-toast";
 import { AlertCircle, Plus } from "lucide-react";
-import type { CustomerDetails, Address, Order } from "@/types";
+import type { Order } from "@/types";
 import { useStore } from "@/store/store";
 import { useShallow } from "zustand/react/shallow";
 
@@ -29,40 +29,69 @@ interface CreateOrderModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onAddOrder: (
-    order: Omit<Order, "id" | "createdAt" | "updatedAt">
+    order: Omit<Order, "id" | "createdAt" | "updatedAt"> & {
+      items: { productId: string; quantity: number }[];
+    }
   ) => Promise<void>;
 }
 
 export function CreateOrderModal({
   open,
   onOpenChange,
+  onAddOrder,
 }: CreateOrderModalProps) {
-  const { products, onAddOrder, fetchOrders } = useStore(
-    useShallow((state) => ({
-      products: state.products,
-      onAddOrder: state.addOrder,
-      fetchOrders: state.fetchOrders,
-    }))
-  );
+  const { products, discounts, fetchProducts, fetchDiscounts, fetchOrders } =
+    useStore(
+      useShallow((state) => ({
+        products: state.products,
+        discounts: state.discounts,
+        fetchProducts: state.fetchProducts,
+        fetchDiscounts: state.fetchDiscounts,
+        fetchOrders: state.fetchOrders,
+      }))
+    );
 
-  const [customerDetails, setCustomerDetails] = useState<CustomerDetails>({
-    firstName: "",
-    lastName: "",
-    email: "",
-    phone: "",
-  });
-
-  const [shippingAddress, setShippingAddress] = useState<Address>({
-    address: "",
-    city: "",
-    state: "",
-    postalCode: "",
-    country: "Nigeria",
-  });
-
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
+  const [city, setCity] = useState("");
+  const [state, setState] = useState("");
+  const [postalCode, setPostalCode] = useState("");
+  const [country, setCountry] = useState("Nigeria");
   const [selectedItems, setSelectedItems] = useState<
     { productId: string; quantity: number }[]
   >([]);
+  const [selectedDiscountId, setSelectedDiscountId] = useState<string>("none");
+  const [discountError, setDiscountError] = useState<string>("");
+  const [subtotal, setSubtotal] = useState(0);
+  const [total, setTotal] = useState(0);
+  const [discountAmount, setDiscountAmount] = useState(0);
+
+  // Fetch products and discounts on mount if empty
+  useEffect(() => {
+    if (!products || products.length === 0) {
+      fetchProducts().catch((err) => {
+        console.error("[FETCH_PRODUCTS]", err);
+        toast({
+          title: "Error",
+          description: "Failed to fetch products.",
+          variant: "destructive",
+        });
+      });
+    }
+    if (!discounts || discounts.length === 0) {
+      fetchDiscounts().catch((err) => {
+        console.error("[FETCH_DISCOUNTS]", err);
+        toast({
+          title: "Error",
+          description: "Failed to fetch discounts.",
+          variant: "destructive",
+        });
+      });
+    }
+  }, [products, discounts, fetchProducts, fetchDiscounts]);
 
   // Add item to order
   const addItemToOrder = () => {
@@ -87,15 +116,96 @@ export function CreateOrderModal({
     setSelectedItems(newItems);
   };
 
+  // Calculate totals and validate discount
+  const calculateTotals = async () => {
+    let calculatedSubtotal = 0;
+    let calculatedTotal = 0;
+    let calculatedDiscountAmount = 0;
+    let error = "";
+
+    try {
+      // Calculate subtotal
+      for (const item of selectedItems) {
+        if (item.productId) {
+          const product = products.find((p) => p.id === item.productId);
+          if (product) {
+            calculatedSubtotal += product.price * item.quantity;
+          }
+        }
+      }
+
+      calculatedTotal = calculatedSubtotal;
+
+      // Validate discount
+      if (selectedDiscountId !== "none") {
+        const discount = discounts.find((d) => d.id === selectedDiscountId);
+        if (!discount) {
+          error = "Selected discount is invalid.";
+        } else if (!discount.isActive) {
+          error = `Discount ${discount.code} is not active.`;
+        } else if (
+          discount.startsAt &&
+          new Date(discount.startsAt) > new Date()
+        ) {
+          error = `Discount ${discount.code} is not yet valid.`;
+        } else if (discount.endsAt && new Date(discount.endsAt) < new Date()) {
+          error = `Discount ${discount.code} has expired.`;
+        } else if (
+          discount.usageLimit &&
+          discount.usageCount >= discount.usageLimit
+        ) {
+          error = `Discount ${discount.code} has reached its usage limit.`;
+        } else if (
+          discount.minSubtotal &&
+          calculatedSubtotal < discount.minSubtotal
+        ) {
+          error = `Order subtotal (₦${calculatedSubtotal.toFixed(
+            2
+          )}) is below the minimum required (₦${discount.minSubtotal.toFixed(
+            2
+          )}) for discount ${discount.code}.`;
+        } else if (
+          discount.products?.length &&
+          !selectedItems.some((item) =>
+            discount.products.some((p) => p.id === item.productId)
+          )
+        ) {
+          error = `Selected products do not qualify for discount ${discount.code}.`;
+        } else {
+          if (discount.type === "percentage") {
+            calculatedDiscountAmount =
+              (discount.value / 100) * calculatedSubtotal;
+          } else if (discount.type === "fixed_amount") {
+            calculatedDiscountAmount = discount.value;
+          } else if (discount.type === "free_shipping") {
+            calculatedDiscountAmount = 0; // Adjust if shipping costs are added
+          }
+          calculatedTotal = Math.max(
+            0,
+            calculatedSubtotal - calculatedDiscountAmount
+          );
+        }
+      }
+    } catch (err) {
+      error = "Failed to calculate totals.";
+      console.error("[CALCULATE_TOTALS]", err);
+    }
+
+    setSubtotal(calculatedSubtotal);
+    setTotal(calculatedTotal);
+    setDiscountAmount(calculatedDiscountAmount);
+    setDiscountError(error);
+  };
+
+  // Recalculate totals when items or discount change
+  useEffect(() => {
+    calculateTotals();
+  }, [selectedItems, selectedDiscountId, products, discounts]);
+
   // Create order
   const handleCreateOrder = async () => {
-    // Validate customer details
-    if (
-      !customerDetails.firstName ||
-      !customerDetails.lastName ||
-      !customerDetails.email ||
-      !customerDetails.phone
-    ) {
+    // Validate fields
+    if (!firstName || !lastName || !email || !phone) {
       toast({
         title: "Missing Customer Information",
         description: "Please fill in all customer details",
@@ -104,13 +214,7 @@ export function CreateOrderModal({
       return;
     }
 
-    // Validate shipping address
-    if (
-      !shippingAddress.address ||
-      !shippingAddress.city ||
-      !shippingAddress.state ||
-      !shippingAddress.postalCode
-    ) {
+    if (!address || !city || !state || !postalCode || !country) {
       toast({
         title: "Missing Shipping Information",
         description: "Please fill in all shipping address details",
@@ -119,57 +223,70 @@ export function CreateOrderModal({
       return;
     }
 
-    // Validate items
     if (
       selectedItems.length === 0 ||
-      selectedItems.some((item) => !item.productId)
+      selectedItems.some((item) => !item.productId || item.quantity <= 0)
     ) {
       toast({
         title: "Invalid Order Items",
-        description: "Please add at least one valid product to the order",
+        description:
+          "Please add at least one valid product with a quantity greater than 0",
         variant: "destructive",
       });
       return;
     }
 
-    // Prepare order items
-    const items = selectedItems.map((item) => ({
-      productId: item.productId,
-      quantity: item.quantity,
-    }));
+    if (discountError) {
+      toast({
+        title: "Invalid Discount",
+        description: discountError,
+        variant: "destructive",
+      });
+      return;
+    }
 
-    // Prepare order data for backend
     const orderData = {
-      firstName: customerDetails.firstName,
-      lastName: customerDetails.lastName,
-      email: customerDetails.email,
-      phone: customerDetails.phone,
-      address: shippingAddress.address,
-      city: shippingAddress.city,
-      state: shippingAddress.state,
-      postalCode: shippingAddress.postalCode,
-      country: shippingAddress.country,
-      items,
+      firstName,
+      lastName,
+      email,
+      phone,
+      address,
+      city,
+      state,
+      postalCode,
+      country,
+      items: selectedItems,
+      discountId:
+        selectedDiscountId !== "none" ? selectedDiscountId : undefined,
+      subtotal,
+      total,
     };
 
     try {
       await onAddOrder(orderData);
-      await fetchOrders(); // 👈 Fetch the latest orders after adding
-      setCustomerDetails({ firstName: "", lastName: "", email: "", phone: "" });
-      setShippingAddress({
-        address: "",
-        city: "",
-        state: "",
-        postalCode: "",
-        country: "Nigeria",
-      });
+      await fetchOrders();
+      setFirstName("");
+      setLastName("");
+      setEmail("");
+      setPhone("");
+      setAddress("");
+      setCity("");
+      setState("");
+      setPostalCode("");
+      setCountry("Nigeria");
       setSelectedItems([]);
+      setSelectedDiscountId("none");
+      setDiscountError("");
+      setSubtotal(0);
+      setTotal(0);
+      setDiscountAmount(0);
       onOpenChange(false);
       toast({
         title: "Order Created",
         description: "Order has been created successfully",
       });
     } catch (error) {
+      console.error("[CREATE_ORDER]", error);
       toast({
         title: "Error",
         description: "Failed to create order. Please try again.",
@@ -184,8 +301,8 @@ export function CreateOrderModal({
         <DialogHeader>
           <DialogTitle>Create New Order</DialogTitle>
           <DialogDescription>
-            Create a new order by entering customer details and selecting
-            products
+            Create a new order by entering customer details, selecting products,
+            and applying a discount if applicable
           </DialogDescription>
         </DialogHeader>
 
@@ -197,13 +314,8 @@ export function CreateOrderModal({
                 <Label htmlFor="firstName">First Name</Label>
                 <Input
                   id="firstName"
-                  value={customerDetails.firstName}
-                  onChange={(e) =>
-                    setCustomerDetails({
-                      ...customerDetails,
-                      firstName: e.target.value,
-                    })
-                  }
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
                   required
                 />
               </div>
@@ -211,13 +323,8 @@ export function CreateOrderModal({
                 <Label htmlFor="lastName">Last Name</Label>
                 <Input
                   id="lastName"
-                  value={customerDetails.lastName}
-                  onChange={(e) =>
-                    setCustomerDetails({
-                      ...customerDetails,
-                      lastName: e.target.value,
-                    })
-                  }
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
                   required
                 />
               </div>
@@ -228,13 +335,8 @@ export function CreateOrderModal({
                 <Input
                   id="email"
                   type="email"
-                  value={customerDetails.email}
-                  onChange={(e) =>
-                    setCustomerDetails({
-                      ...customerDetails,
-                      email: e.target.value,
-                    })
-                  }
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   required
                 />
               </div>
@@ -242,13 +344,8 @@ export function CreateOrderModal({
                 <Label htmlFor="phone">Phone</Label>
                 <Input
                   id="phone"
-                  value={customerDetails.phone}
-                  onChange={(e) =>
-                    setCustomerDetails({
-                      ...customerDetails,
-                      phone: e.target.value,
-                    })
-                  }
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
                   required
                 />
               </div>
@@ -262,13 +359,8 @@ export function CreateOrderModal({
                 <Label htmlFor="address">Address</Label>
                 <Input
                   id="address"
-                  value={shippingAddress.address}
-                  onChange={(e) =>
-                    setShippingAddress({
-                      ...shippingAddress,
-                      address: e.target.value,
-                    })
-                  }
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
                   required
                 />
               </div>
@@ -277,13 +369,8 @@ export function CreateOrderModal({
                   <Label htmlFor="city">City</Label>
                   <Input
                     id="city"
-                    value={shippingAddress.city}
-                    onChange={(e) =>
-                      setShippingAddress({
-                        ...shippingAddress,
-                        city: e.target.value,
-                      })
-                    }
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
                     required
                   />
                 </div>
@@ -291,13 +378,8 @@ export function CreateOrderModal({
                   <Label htmlFor="state">State</Label>
                   <Input
                     id="state"
-                    value={shippingAddress.state}
-                    onChange={(e) =>
-                      setShippingAddress({
-                        ...shippingAddress,
-                        state: e.target.value,
-                      })
-                    }
+                    value={state}
+                    onChange={(e) => setState(e.target.value)}
                     required
                   />
                 </div>
@@ -307,13 +389,8 @@ export function CreateOrderModal({
                   <Label htmlFor="postalCode">Postal Code</Label>
                   <Input
                     id="postalCode"
-                    value={shippingAddress.postalCode}
-                    onChange={(e) =>
-                      setShippingAddress({
-                        ...shippingAddress,
-                        postalCode: e.target.value,
-                      })
-                    }
+                    value={postalCode}
+                    onChange={(e) => setPostalCode(e.target.value)}
                     required
                   />
                 </div>
@@ -321,17 +398,52 @@ export function CreateOrderModal({
                   <Label htmlFor="country">Country</Label>
                   <Input
                     id="country"
-                    value={shippingAddress.country}
-                    onChange={(e) =>
-                      setShippingAddress({
-                        ...shippingAddress,
-                        country: e.target.value,
-                      })
-                    }
+                    value={country}
+                    onChange={(e) => setCountry(e.target.value)}
                     required
                   />
                 </div>
               </div>
+            </div>
+          </div>
+
+          <div className="grid gap-2">
+            <h3 className="text-lg font-medium">Discount</h3>
+            <div className="grid gap-2">
+              <Label htmlFor="discount">Discount</Label>
+              <Select
+                value={selectedDiscountId}
+                onValueChange={(value) => {
+                  setSelectedDiscountId(value);
+                  setDiscountError("");
+                }}
+              >
+                <SelectTrigger id="discount">
+                  <SelectValue placeholder="Select a discount (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No Discount</SelectItem>
+                  {discounts.map((discount) => (
+                    <SelectItem key={discount.id} value={discount.id}>
+                      {discount.code} -{" "}
+                      {discount.type === "percentage"
+                        ? `${discount.value}%`
+                        : discount.type === "fixed_amount"
+                        ? `₦${discount.value.toFixed(2)}`
+                        : "Free Shipping"}{" "}
+                      {discount.minSubtotal
+                        ? `(Min: ₦${discount.minSubtotal.toFixed(2)})`
+                        : ""}{" "}
+                      {discount.products?.length
+                        ? `(${discount.products.length} products)`
+                        : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {discountError && (
+                <p className="text-sm text-red-600">{discountError}</p>
+              )}
             </div>
           </div>
 
@@ -365,7 +477,7 @@ export function CreateOrderModal({
                             onValueChange={(value) =>
                               updateOrderItem(index, "productId", value)
                             }
-                            defaultValue={item.productId}
+                            value={item.productId}
                           >
                             <SelectTrigger>
                               <SelectValue placeholder="Select a product" />
@@ -436,18 +548,12 @@ export function CreateOrderModal({
                   </div>
                 ))}
 
-                <div className="flex justify-end text-sm font-medium">
-                  Total: ₦
-                  {selectedItems
-                    .reduce((sum, item) => {
-                      const product = products.find(
-                        (p) => p.id === item.productId
-                      );
-                      return (
-                        sum + (product ? product.price * item.quantity : 0)
-                      );
-                    }, 0)
-                    .toFixed(2)}
+                <div className="flex justify-end gap-4 text-sm font-medium">
+                  <div>Subtotal: ₦{subtotal.toFixed(2)}</div>
+                  {discountAmount > 0 && (
+                    <div>Discount: ₦{discountAmount.toFixed(2)}</div>
+                  )}
+                  <div>Total: ₦{total.toFixed(2)}</div>
                 </div>
               </div>
             )}
@@ -458,7 +564,12 @@ export function CreateOrderModal({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleCreateOrder}>Create Order</Button>
+          <Button
+            onClick={handleCreateOrder}
+            disabled={!!discountError || selectedItems.length === 0}
+          >
+            Create Order
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

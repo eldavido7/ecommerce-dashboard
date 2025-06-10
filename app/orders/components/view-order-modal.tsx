@@ -43,7 +43,20 @@ export function ViewOrderModal({
 }: ViewOrderModalProps) {
   if (!order) return null;
 
-  const total = order.items.reduce((sum, item) => sum + item.subtotal, 0);
+  const originalTotal = order.items.reduce(
+    (sum, item) => sum + item.subtotal,
+    0
+  );
+
+  let discountedTotal = originalTotal;
+
+  if (order.discount) {
+    if (order.discount.type === "percentage") {
+      discountedTotal = originalTotal * (1 - order.discount.value / 100);
+    } else if (order.discount.type === "fixed_amount") {
+      discountedTotal = Math.max(0, originalTotal - order.discount.value);
+    }
+  }
 
   const [selectedStatus, setSelectedStatus] = useState<string>(
     order.status ?? "PENDING"
@@ -136,9 +149,32 @@ export function ViewOrderModal({
                   <CardTitle>Order Summary</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
+                  {order.discount && (
+                    <div className="flex justify-between text-sm text-gray-700">
+                      <span>Discount ({order.discount.code})</span>
+                      <span>
+                        {order.discount.type === "percentage"
+                          ? `${order.discount.value}%`
+                          : `₦${order.discount.value.toLocaleString()}`}
+                      </span>
+                    </div>
+                  )}
                   <div className="flex justify-between font-bold border-t pt-2">
                     <span>Total</span>
-                    <span>₦{total.toLocaleString()}</span>
+                    <span>
+                      {order.discount ? (
+                        <>
+                          <span className="line-through text-gray-500 mr-2">
+                            ₦{originalTotal.toLocaleString()}
+                          </span>
+                          <span className="text-green-600 font-semibold">
+                            ₦{Math.round(discountedTotal).toLocaleString()}
+                          </span>
+                        </>
+                      ) : (
+                        <>₦{originalTotal.toLocaleString()}</>
+                      )}
+                    </span>
                   </div>
                 </CardContent>
               </Card>
@@ -153,11 +189,10 @@ export function ViewOrderModal({
                   <h4 className="font-medium">Contact Details</h4>
                   <div className="text-sm mt-1">
                     <p>
-                      {order.customerDetails.firstName}{" "}
-                      {order.customerDetails.lastName}
+                      {order.firstName} {order.lastName}
                     </p>
-                    <p>{order.customerDetails.email}</p>
-                    <p>{order.customerDetails.phone}</p>
+                    <p>{order.email}</p>
+                    <p>{order.phone}</p>
                   </div>
                 </div>
               </CardContent>
@@ -172,10 +207,10 @@ export function ViewOrderModal({
               <CardContent>
                 <div className="text-sm">
                   <p>
-                    {order.address.address}, {order.address.city},{" "}
-                    {order.address.state} {order.address.postalCode}
+                    {order.address}, {order.city}, {order.state}{" "}
+                    {order.postalCode}
                   </p>
-                  <p>{order.address.country}</p>
+                  <p>{order.country}</p>
                 </div>
               </CardContent>
             </Card>
