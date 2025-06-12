@@ -25,20 +25,21 @@ import { useToast } from "@/hooks/use-toast";
 import type { Product } from "@/types";
 import { Toaster } from "@/components/ui/toaster";
 import { useStore } from "@/store/store"; // Adjust path as needed
+import { Skeleton } from "@/components/ui/skeleton";
 
 const ITEMS_PER_PAGE = 9;
 
 export default function StorePage() {
   const { addItem } = useCart();
   const { toast } = useToast();
+  // Get products from store
+  const { products } = useStore();
+
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [isLoading, setIsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
-
-  // Get products from store
-  const { products, fetchProducts } = useStore();
 
   // Fetch products on component mount if not already loaded
   useEffect(() => {
@@ -56,6 +57,66 @@ export default function StorePage() {
       setLoading(false);
     }
   }, []);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedCategory]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <StoreHeader />
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-green-600" />
+            <p className="text-gray-600">Loading products...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="flex-1 space-y-4 p-8 pt-6">
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-10 w-[300px]" />
+          <Skeleton className="h-10 w-[120px]" />
+        </div>
+
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-6 w-[200px] mb-2" />
+            <Skeleton className="h-4 w-[300px]" />
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-[100px]" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+
+            <Skeleton className="h-24 w-full" />
+
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-[150px]" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-[150px]" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+
+            <div className="flex justify-end space-x-2">
+              <Skeleton className="h-10 w-[100px]" />
+              <Skeleton className="h-10 w-[150px]" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   // Get unique categories from real products
   const categories = [
@@ -92,27 +153,8 @@ export default function StorePage() {
     });
   };
 
-  // Reset to page 1 when filters change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, selectedCategory]);
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <StoreHeader />
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-green-600" />
-            <p className="text-gray-600">Loading products...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-white">
       <Toaster />
       <StoreHeader />
 
@@ -181,7 +223,7 @@ export default function StorePage() {
           </div>
 
           {filteredProducts.length > 0 && (
-            <div className="mt-4 text-sm text-gray-600">
+            <div className="mt-4 text-sm text-gray-400">
               Showing {filteredProducts.length} product
               {filteredProducts.length !== 1 ? "s" : ""}
               {searchTerm && ` for "${searchTerm}"`}

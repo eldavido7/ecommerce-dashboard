@@ -145,7 +145,7 @@ export default function OrdersPage() {
   const handleUpdateStatus = async (orderId: string, newStatus: string) => {
     const orderToUpdate = orders.find((o) => o.id === orderId);
     if (!orderToUpdate) return;
-
+  
     const payload = {
       firstName: orderToUpdate.firstName,
       lastName: orderToUpdate.lastName,
@@ -165,7 +165,7 @@ export default function OrdersPage() {
         quantity: item.quantity,
       })),
     };
-
+  
     try {
       const res = await fetch(`/api/orders/${orderId}`, {
         method: "PATCH",
@@ -174,14 +174,55 @@ export default function OrdersPage() {
         },
         body: JSON.stringify(payload),
       });
-
+  
       if (!res.ok) throw new Error("Failed to update order");
-
+  
+      // ✅ Send email notification after successful status update
+      try {
+        console.log('Sending email to:', orderToUpdate.email, 'for order:', orderId);
+        
+        const emailRes = await fetch('/api/email', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: orderToUpdate.email,
+            firstName: orderToUpdate.firstName,
+            lastName: orderToUpdate.lastName,
+            orderId: orderId,
+            status: newStatus,
+            orderDetails: {
+              items: orderToUpdate.items,
+              discount: orderToUpdate.discount,
+              address: orderToUpdate.address,
+              city: orderToUpdate.city,
+              state: orderToUpdate.state,
+              postalCode: orderToUpdate.postalCode,
+              country: orderToUpdate.country,
+              shippingCost: orderToUpdate.shippingCost,
+            }
+          }),
+        });
+  
+        const emailResult = await emailRes.json();
+        
+        if (!emailRes.ok) {
+          console.error('Failed to send email notification:', emailResult);
+          // Don't throw error here - we don't want email failure to affect the main flow
+        } else {
+          console.log('Email sent successfully:', emailResult);
+        }
+      } catch (emailError) {
+        console.error('Email sending error:', emailError);
+        // Email failure shouldn't break the status update flow
+      }
+  
       toast({
         title: "Order Status Updated",
         description: `Order #${orderId} status has been updated to ${newStatus}`,
       });
-
+  
       async function fetchOrders() {
         try {
           await useStore.getState().fetchOrders();
@@ -194,7 +235,7 @@ export default function OrdersPage() {
           });
         }
       }
-
+  
       // ✅ Refresh orders to reflect updated status
       await fetchOrders();
     } catch (err) {

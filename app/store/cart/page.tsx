@@ -377,7 +377,7 @@ export default function CartPage() {
               toast({
                 title: "Payment successful",
                 description:
-                  "Your order is being processed. Thank you for shopping with us!",
+                  "Your order is being processed, and we will contact you about it shortly. Thank you for shopping with us!",
               });
 
               clearCart();

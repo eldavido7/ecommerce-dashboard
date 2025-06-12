@@ -46,7 +46,7 @@ export function ViewOrderModal({
 
   const [loading, setLoading] = useState(true);
 
-  const { shippingOptions, fetchSettings } = useSettingsStore();
+  const { shippingOptions } = useSettingsStore();
 
   const selectedShippingOption = shippingOptions.find(
     (option) => option.id === order.shippingOptionId

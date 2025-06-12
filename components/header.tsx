@@ -29,7 +29,7 @@ export function Header({ onMenuClick }: HeaderProps) {
     setMounted(true);
   }, []);
 
-  // Debug function to help diagnose the issue
+  // Toggle theme between dark and light
   const toggleTheme = () => {
     console.log("Current theme:", theme);
     const newTheme = theme === "dark" ? "light" : "dark";

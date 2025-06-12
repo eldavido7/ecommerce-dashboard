@@ -1,15 +1,31 @@
 "use client";
 
 import Link from "next/link";
-import { ShoppingCart, Leaf, Menu, X } from "lucide-react";
+import { ShoppingCart, Leaf, Menu, X, Sun, Moon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/contexts/cart-context";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { useTheme } from "next-themes";
 
 export function StoreHeader() {
   const { itemCount } = useCart();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const { setTheme, theme } = useTheme();
+
+  // Toggle theme between dark and light
+  const toggleTheme = () => {
+    console.log("Current theme:", theme);
+    const newTheme = theme === "dark" ? "light" : "dark";
+    console.log("Setting theme to:", newTheme);
+    setTheme(newTheme);
+  };
+
+  // Ensure component is mounted to avoid hydration mismatch
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   return (
     <header className="sticky top-0 z-40 w-full bg-white border-b shadow-sm">
@@ -22,6 +38,20 @@ export function StoreHeader() {
         </div>
 
         <div className="flex items-center space-x-4">
+          {mounted && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleTheme}
+              aria-label="Toggle theme"
+            >
+              {theme === "dark" ? (
+                <Sun className="h-5 w-5" />
+              ) : (
+                <Moon className="h-5 w-5" />
+              )}
+            </Button>
+          )}
           <Link href="/store/cart" className="relative">
             <Button variant="ghost" size="icon">
               <ShoppingCart className="w-5 h-5" />
