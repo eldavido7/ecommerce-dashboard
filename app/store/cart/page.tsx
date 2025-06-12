@@ -423,7 +423,7 @@ export default function CartPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-white">
       <StoreHeader />
       <main className="px-4 py-8 md:px-36">
         <div className="mb-6">
