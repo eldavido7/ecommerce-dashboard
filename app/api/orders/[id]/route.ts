@@ -13,6 +13,7 @@ export async function GET(
             include: {
                 items: { include: { product: true } },
                 discount: true,
+                shippingOption: true, // Include shipping option
             },
         });
 
@@ -47,6 +48,9 @@ export async function PATCH(
             status,
             items = [],
             discountId,
+            shippingOptionId,
+            shippingCost,
+            paymentReference,
             subtotal: providedSubtotal,
             total: providedTotal,
         } = data;
@@ -66,13 +70,13 @@ export async function PATCH(
             return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
         }
 
-        if (status && !["PENDING", "PROCESSING", "SHIPPED", "DELIVERED", "CANCELED"].includes(status)) {
+        if (status && !["PENDING", "PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED"].includes(status)) {
             return NextResponse.json({ error: "Invalid status" }, { status: 400 });
         }
 
         const existingOrder = await prisma.order.findUnique({
             where: { id },
-            include: { items: true, discount: true },
+            include: { items: true, discount: true, shippingOption: true },
         });
 
         if (!existingOrder) {
@@ -115,10 +119,28 @@ export async function PATCH(
             return NextResponse.json({ error: "Provided subtotal does not match calculated subtotal" }, { status: 400 });
         }
 
+        // Validate shipping option
+        let calculatedShippingCost = 0;
+        let shippingOptionIdToUse = shippingOptionId !== undefined ? shippingOptionId : existingOrder.shippingOptionId;
+        if (shippingOptionIdToUse) {
+            const shippingOption = await prisma.shippingOption.findUnique({
+                where: { id: shippingOptionIdToUse },
+            });
+            if (!shippingOption || shippingOption.status !== "ACTIVE") {
+                return NextResponse.json({ error: "Invalid or inactive shipping option" }, { status: 400 });
+            }
+            calculatedShippingCost = shippingOption.price;
+            if (shippingCost !== undefined && shippingCost !== calculatedShippingCost) {
+                return NextResponse.json({ error: "Provided shipping cost does not match selected option" }, { status: 400 });
+            }
+        } else if (shippingCost !== undefined && shippingCost !== 0) {
+            return NextResponse.json({ error: "Shipping cost provided without shipping option" }, { status: 400 });
+        }
+
         // Discount logic
         let discount: Discount | null = null;
         let discountAmount = 0;
-        let total = calculatedSubtotal;
+        let total = calculatedSubtotal + calculatedShippingCost;
         let discountIdToUse = discountId !== undefined ? discountId : existingOrder.discountId;
 
         if (discountIdToUse) {
@@ -150,17 +172,27 @@ export async function PATCH(
             } else if (discount.type === "fixed_amount") {
                 discountAmount = discount.value;
             } else if (discount.type === "free_shipping") {
-                discountAmount = 0; // Adjust if shipping cost is added
+                discountAmount = calculatedShippingCost; // Free shipping nullifies shipping cost
             }
 
-            total = Math.max(0, calculatedSubtotal - discountAmount);
+            total = Math.max(0, calculatedSubtotal + calculatedShippingCost - discountAmount);
         } else if (discountId === null) {
-            total = calculatedSubtotal;
+            total = calculatedSubtotal + calculatedShippingCost;
         }
 
         // Validate provided total
         if (providedTotal !== undefined && providedTotal !== total) {
             return NextResponse.json({ error: "Provided total does not match calculated total" }, { status: 400 });
+        }
+
+        // Validate paymentReference (optional, only for Paystack orders)
+        if (paymentReference !== undefined && paymentReference !== existingOrder.paymentReference) {
+            const existingOrderWithReference = await prisma.order.findFirst({
+                where: { paymentReference },
+            });
+            if (existingOrderWithReference && existingOrderWithReference.id !== id) {
+                return NextResponse.json({ error: "Payment reference already used" }, { status: 400 });
+            }
         }
 
         // Update with transaction
@@ -212,12 +244,16 @@ export async function PATCH(
                     country,
                     status,
                     subtotal: calculatedSubtotal,
+                    shippingOptionId: shippingOptionIdToUse,
+                    shippingCost: calculatedShippingCost,
                     total,
                     discountId: discountIdToUse,
+                    paymentReference,
                 },
                 include: {
                     items: { include: { product: true } },
                     discount: true,
+                    shippingOption: true,
                 },
             });
         });

@@ -280,11 +280,11 @@ export default function SettingsPage() {
 
       <Tabs defaultValue="users" onValueChange={setActiveTab}>
         <TabsList>
-          {/* <TabsTrigger value="shipping">Shipping</TabsTrigger> */}
           <TabsTrigger value="users">Users</TabsTrigger>
+          <TabsTrigger value="shipping">Shipping</TabsTrigger>
         </TabsList>
 
-        {/* <TabsContent value="shipping" className="space-y-4">
+        <TabsContent value="shipping" className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle>Shipping Options</CardTitle>
@@ -405,7 +405,7 @@ export default function SettingsPage() {
             shippingOption={currentShipping}
             onEditShippingOption={editShippingOption}
           />
-        </TabsContent> */}
+        </TabsContent>
 
         <TabsContent value="users" className="space-y-4">
           <Card>

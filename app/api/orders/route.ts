@@ -11,6 +11,7 @@ export async function GET() {
                     include: { product: true },
                 },
                 discount: true,
+                shippingOption: true, // Include shipping option
             },
             orderBy: { createdAt: "desc" },
         });
@@ -23,8 +24,16 @@ export async function GET() {
 
 // Create a new order
 export async function POST(req: Request) {
+
+    let body;
     try {
-        const body = await req.json();
+        body = await req.json();
+    } catch (err) {
+        console.error("[PARSE_JSON_ERROR]", err);
+        return NextResponse.json({ error: "Invalid JSON in request body" }, { status: 400 });
+    }
+
+    try {
         const {
             firstName,
             lastName,
@@ -37,6 +46,9 @@ export async function POST(req: Request) {
             country,
             items,
             discountId,
+            shippingOptionId,
+            shippingCost,
+            paymentReference,
             subtotal: providedSubtotal,
             total: providedTotal,
         } = body;
@@ -82,10 +94,27 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Provided subtotal does not match calculated subtotal" }, { status: 400 });
         }
 
+        // Validate shipping option
+        let calculatedShippingCost = 0;
+        if (shippingOptionId) {
+            const shippingOption = await prisma.shippingOption.findUnique({
+                where: { id: shippingOptionId },
+            });
+            if (!shippingOption || shippingOption.status !== "ACTIVE") {
+                return NextResponse.json({ error: "Invalid or inactive shipping option" }, { status: 400 });
+            }
+            calculatedShippingCost = shippingOption.price;
+            if (shippingCost !== calculatedShippingCost) {
+                return NextResponse.json({ error: "Provided shipping cost does not match selected option" }, { status: 400 });
+            }
+        } else if (shippingCost !== 0) {
+            return NextResponse.json({ error: "Shipping cost provided without shipping option" }, { status: 400 });
+        }
+
         // Discount logic
         let discount: Discount | null = null;
         let discountAmount = 0;
-        let total = calculatedSubtotal;
+        let total = calculatedSubtotal + calculatedShippingCost;
 
         if (discountId) {
             discount = await prisma.discount.findUnique({
@@ -108,8 +137,13 @@ export async function POST(req: Request) {
                 return NextResponse.json({ error: "Order subtotal below minimum for discount" }, { status: 400 });
             }
 
-            if (discount.products?.length && !items.some(item => discount?.products?.some(p => p.id === item.productId))) {
-                return NextResponse.json({ error: "Discount not applicable to order items" }, { status: 400 });
+            if ((discount?.products ?? []).length > 0) {
+                const applicable = items.some(item =>
+                    discount?.products!.some(p => p.id === item.productId)
+                );
+                if (!applicable) {
+                    return NextResponse.json({ error: "Discount not applicable to order items" }, { status: 400 });
+                }
             }
 
             // Apply discount
@@ -118,15 +152,25 @@ export async function POST(req: Request) {
             } else if (discount.type === "fixed_amount") {
                 discountAmount = discount.value;
             } else if (discount.type === "free_shipping") {
-                discountAmount = 0; // Adjust if shipping cost is added
+                discountAmount = calculatedShippingCost; // Free shipping nullifies shipping cost
             }
 
-            total = Math.max(0, calculatedSubtotal - discountAmount);
+            total = Math.max(0, calculatedSubtotal + calculatedShippingCost - discountAmount);
         }
 
         // Validate provided total
         if (providedTotal !== total) {
             return NextResponse.json({ error: "Provided total does not match calculated total" }, { status: 400 });
+        }
+
+        // Validate paymentReference (optional, only for Paystack orders)
+        if (paymentReference) {
+            const existingOrder = await prisma.order.findFirst({
+                where: { paymentReference },
+            });
+            if (existingOrder) {
+                return NextResponse.json({ error: "Payment reference already used" }, { status: 400 });
+            }
         }
 
         // Create order with transaction
@@ -144,13 +188,19 @@ export async function POST(req: Request) {
                     country,
                     status: "PENDING",
                     subtotal: calculatedSubtotal,
+                    shippingOption: shippingOptionId
+                        ? { connect: { id: shippingOptionId } }
+                        : undefined, // ✅ Proper relation linking
+                    shippingCost: calculatedShippingCost,
                     total,
                     discount: discount ? { connect: { id: discount.id } } : undefined,
+                    paymentReference,
                     items: { create: orderItems },
                 },
                 include: {
                     items: { include: { product: true } },
                     discount: true,
+                    shippingOption: true,
                 },
             });
 
@@ -162,13 +212,12 @@ export async function POST(req: Request) {
             }
 
             return createdOrder;
-        },
-            { timeout: 15000 } // Set timeout to 15 seconds (15000 ms)
-        );
+        }, { timeout: 15000 });
 
         return NextResponse.json(order);
-    } catch (error) {
-        console.error("[CREATE_ORDER]", error);
+    } catch (error: any) {
+        console.error("[CREATE_ORDER]", error?.message ?? error);
+        if (error?.code) console.error("Prisma Error Code:", error.code);
         return NextResponse.json({ error: "Failed to create order" }, { status: 500 });
     }
 }

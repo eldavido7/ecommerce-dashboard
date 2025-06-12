@@ -10,24 +10,11 @@ export interface Product {
   barcode: String
   createdAt: Date
   updatedAt: Date
+  imageUrl?: string
+  imagePublicId?: string
 }
 
 // Order Types
-// export interface Address {
-//   address: string;
-//   city: string;
-//   state: string;
-//   postalCode: string;
-//   country: string;
-// }
-
-// export interface CustomerDetails {
-//   firstName: string;
-//   lastName: string;
-//   email: string;
-//   phone: string;
-// }
-
 export interface OrderItem {
   id: string;
   productId: string;
@@ -54,9 +41,12 @@ export interface Order {
   items: OrderItem[];
   status: "PENDING" | "PROCESSING" | "SHIPPED" | "DELIVERED" | "CANCELLED";
   subtotal: number; // Sum of OrderItem.subtotal
-  total: number; // Final total after discount
+  shippingOptionId?: string | null; // References ShippingOption
+  shippingCost?: number | null; // Cost of selected shipping option
+  total: number; // Subtotal + shippingCost - discount
   discountId?: string | null;
   discount?: Discount | null;
+  paymentReference?: string | null; // Paystack transaction reference
   createdAt: Date;
   updatedAt: Date;
 }

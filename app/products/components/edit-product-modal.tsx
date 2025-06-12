@@ -21,8 +21,9 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "@/components/ui/use-toast";
 import type { Product } from "@/types";
-import { useEffect, useState } from "react";
-
+import { useEffect, useRef, useState } from "react";
+import { Upload, X, Loader2, ImageIcon } from "lucide-react";
+import Image from "next/image";
 interface EditProductModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -44,7 +45,13 @@ export function EditProductModal({
     category: "",
     tags: [],
     barcode: "",
+    imageUrl: "",
+    imagePublicId: "",
   });
+
+  const [isUploading, setIsUploading] = useState(false);
+  const [previewImage, setPreviewImage] = useState<string>("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (product) {
@@ -56,9 +63,96 @@ export function EditProductModal({
         category: product.category,
         tags: product.tags,
         barcode: product.barcode,
+        imageUrl: product.imageUrl,
+        imagePublicId: product.imagePublicId,
       });
+      // Show preview of the existing image
+      setPreviewImage(product.imageUrl || "");
     }
   }, [product]);
+
+  const handleImageUpload = async (file: File) => {
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith("image/")) {
+      toast({
+        title: "Invalid file type",
+        description: "Please select an image file.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate file size (5MB limit)
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: "File too large",
+        description: "Please select an image smaller than 5MB.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsUploading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error("Upload failed");
+      }
+
+      const { imageUrl, imagePublicId } = await response.json();
+
+      setProductForm((prev) => ({
+        ...prev,
+        imageUrl,
+        imagePublicId,
+      }));
+
+      setPreviewImage(imageUrl);
+
+      toast({
+        title: "Image uploaded",
+        description: "Product image has been uploaded successfully.",
+      });
+    } catch (error) {
+      console.error("Upload error:", error);
+      toast({
+        title: "Upload failed",
+        description: "Failed to upload image. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleImageUpload(file);
+    }
+  };
+
+  const removeImage = () => {
+    setProductForm({
+      ...productForm,
+      imageUrl: "",
+      imagePublicId: "",
+    });
+    setPreviewImage("");
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
 
   const saveProductChanges = async () => {
     if (!product) return;
@@ -98,6 +192,84 @@ export function EditProductModal({
           <DialogDescription>Update the product details.</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
+          {/* Image Upload Section */}
+          <div className="grid grid-cols-4 items-start gap-4">
+            <Label className="text-right mt-2">Product Image</Label>
+            <div className="col-span-3 space-y-2">
+              {previewImage ? (
+                <div className="relative w-32 h-32 border rounded-lg overflow-hidden">
+                  <Image
+                    src={previewImage}
+                    alt="Product preview"
+                    fill
+                    className="object-cover"
+                    sizes="128px"
+                  />
+                  <button
+                    title="remove image"
+                    type="button"
+                    onClick={removeImage}
+                    className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-red-600"
+                    disabled={isUploading}
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ) : (
+                <div
+                  className="w-32 h-32 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-gray-400 transition-colors"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  {isUploading ? (
+                    <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+                  ) : (
+                    <>
+                      <ImageIcon className="w-6 h-6 text-gray-400 mb-1" />
+                      <span className="text-xs text-gray-500 text-center px-2">
+                        Click to upload
+                      </span>
+                    </>
+                  )}
+                </div>
+              )}
+
+              <input
+                title="Product Image"
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileSelect}
+                className="hidden"
+                disabled={isUploading}
+              />
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+                className="w-fit"
+              >
+                {isUploading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4 mr-2" />
+                    {previewImage ? "Change Image" : "Upload Image"}
+                  </>
+                )}
+              </Button>
+
+              <p className="text-xs text-gray-500">
+                Optional. Max file size: 5MB. Supported formats: JPG, PNG, GIF,
+                WebP
+              </p>
+            </div>
+          </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="edit-title" className="text-right">
               Title

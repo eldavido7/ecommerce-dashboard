@@ -8,19 +8,21 @@ datasource db {
 }
 
 model Product {
-  id          String      @id @default(uuid()) // Nano ID will be generated in code
-  title       String
-  description String
-  price       Int // Naira in full units (e.g., 1500 = ₦1500)
-  inventory   Int
-  category    String
-  tags        String[]
-  barcode     String      @unique
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @default(now()) @updatedAt
-  orderItems  OrderItem[]
-  quantity    Int         @default(0) // inventory stock
-  discounts     Discount[]   @relation("ProductDiscounts")
+  id            String      @id @default(uuid()) // Nano ID will be generated in code
+  title         String
+  description   String
+  price         Int // Naira in full units (e.g., 1500 = ₦1500)
+  inventory     Int
+  category      String
+  tags          String[]
+  barcode       String      @unique
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @default(now()) @updatedAt
+  orderItems    OrderItem[]
+  quantity      Int         @default(0) // inventory stock
+  discounts     Discount[]  @relation("ProductDiscounts")
+  imageUrl      String? // URL from Cloudinary
+  imagePublicId String? // Cloudinary public_id for management
 }
 
 enum OrderStatus {
@@ -32,53 +34,57 @@ enum OrderStatus {
 }
 
 model Order {
-  id           String       @id @default(uuid())
-  firstName    String
-  lastName     String
-  email        String
-  phone        String
-  address      String
-  city         String
-  state        String
-  postalCode   String
-  country      String
-  status       OrderStatus  @default(PENDING)
-  subtotal     Float        @default(0) // Sum of OrderItem.subtotal
-  total        Float        @default(0) // Final total after discount
-  discountId   String?
-  discount     Discount?    @relation(fields: [discountId], references: [id])
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @default(now()) @updatedAt
-  items        OrderItem[]
+  id               String          @id @default(uuid())
+  firstName        String
+  lastName         String
+  email            String
+  phone            String
+  address          String
+  city             String
+  state            String
+  postalCode       String
+  country          String
+  status           OrderStatus     @default(PENDING)
+  subtotal         Float           @default(0) // Sum of OrderItem.subtotal
+  shippingOptionId String? // References ShippingOption
+  shippingOption   ShippingOption? @relation(fields: [shippingOptionId], references: [id], name: "OrderToShippingOption")
+  shippingCost     Float?          @default(0) // Cost of selected shipping option
+  paymentReference String? // Paystack transaction reference
+  total            Float           @default(0) // Subtotal + shippingCost - discount
+  discountId       String?
+  discount         Discount?       @relation(fields: [discountId], references: [id])
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @default(now()) @updatedAt
+  items            OrderItem[]
 }
 
 model OrderItem {
-  id        String   @id @default(uuid())
-  order     Order    @relation(fields: [orderId], references: [id])
+  id        String  @id @default(uuid())
+  order     Order   @relation(fields: [orderId], references: [id])
   orderId   String
-  product   Product  @relation(fields: [productId], references: [id])
+  product   Product @relation(fields: [productId], references: [id])
   productId String
   quantity  Int
-  subtotal  Float    // product.price * quantity
+  subtotal  Float // product.price * quantity
 }
 
 model Discount {
-  id           String    @id @default(cuid())
-  code         String    @unique
-  description  String?
-  type         DiscountType
-  value        Float
-  usageLimit   Int?
-  usageCount   Int       @default(0)
-  startsAt     DateTime
-  endsAt       DateTime?
-  isActive     Boolean
-  minSubtotal   Float?   // optional condition
-  products      Product[] @relation("ProductDiscounts") // for product-specific discounts
-  orders        Order[]   // Orders this discount has been applied to
-  conditions   Json?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id          String       @id @default(cuid())
+  code        String       @unique
+  description String?
+  type        DiscountType
+  value       Float
+  usageLimit  Int?
+  usageCount  Int          @default(0)
+  startsAt    DateTime
+  endsAt      DateTime?
+  isActive    Boolean
+  minSubtotal Float? // optional condition
+  products    Product[]    @relation("ProductDiscounts") // for product-specific discounts
+  orders      Order[] // Orders this discount has been applied to
+  conditions  Json?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 }
 
 enum DiscountType {
@@ -98,13 +104,14 @@ model User {
 }
 
 model ShippingOption {
-  id           String   @id @default(cuid())
+  id           String         @id @default(cuid())
   name         String
   price        Float
   deliveryTime String
   status       ShippingStatus @default(ACTIVE)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  orders       Order[]        @relation("OrderToShippingOption")
 }
 
 enum ShippingStatus {

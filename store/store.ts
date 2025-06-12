@@ -13,7 +13,14 @@ interface StoreState {
   // Orders
   orders: Order[];
   fetchOrders: () => Promise<void>;
-  addOrder: (order: Omit<Order, "id" | "createdAt" | "updatedAt" | "subtotal" | "total"> & { items: { productId: string; quantity: number }[] }) => Promise<void>;
+  addOrder: (
+    order: Omit<Order, "id" | "createdAt" | "updatedAt" | "subtotal" | "total"> & {
+      items: { productId: string; quantity: number }[];
+      shippingOptionId?: string | null;
+      shippingCost?: number | null;
+      paymentReference?: string | null;
+    }
+  ) => Promise<void>;
   updateOrder: (id: string, order: Partial<Order>) => Promise<void>;
 
   // Discounts
@@ -100,7 +107,8 @@ export const useStore = create<StoreState>((set, get) => ({
 
   addOrder: async (order) => {
     try {
-      const { products, discounts } = get(); // Access products and discounts from the state
+      const { products, discounts } = get();
+      const { shippingOptions } = useSettingsStore.getState();
 
       // Calculate subtotal from items
       const itemsWithSubtotal = order.items.map((item) => {
@@ -115,20 +123,35 @@ export const useStore = create<StoreState>((set, get) => ({
       });
 
       const subtotal = itemsWithSubtotal.reduce((sum, item) => sum + item.subtotal, 0);
-      let total = subtotal;
-      let discount: Discount | null = null;
+      let shippingCost = 0;
+
+      // Validate shipping option
+      if (order.shippingOptionId) {
+        const shippingOption = shippingOptions.find((s) => s.id === order.shippingOptionId);
+        if (!shippingOption || shippingOption.status !== "ACTIVE") {
+          throw new Error("Invalid or inactive shipping option");
+        }
+        shippingCost = shippingOption.price;
+        if (order.shippingCost !== undefined && order.shippingCost !== shippingCost) {
+          throw new Error("Provided shipping cost does not match selected option");
+        }
+      } else if (order.shippingCost !== undefined && order.shippingCost !== 0) {
+        throw new Error("Shipping cost provided without shipping option");
+      }
 
       // Validate and apply discount
+      let discount: Discount | null = null;
+      let total = subtotal + shippingCost;
+
       if (order.discountId) {
         discount = discounts.find((d) => d.id === order.discountId) || null;
         if (!discount) throw new Error("Invalid discount");
 
-        // Check discount constraints
         if (
           !discount.isActive ||
           (discount.usageLimit && discount.usageCount >= discount.usageLimit) ||
-          (discount.startsAt && new Date(discount.startsAt) > new Date()) || // Fix comparison
-          (discount.endsAt && new Date(discount.endsAt) < new Date()) || // Fix comparison
+          (discount.startsAt && new Date() < new Date(discount.startsAt)) ||
+          (discount.endsAt && new Date() > new Date(discount.endsAt)) ||
           (discount.minSubtotal && subtotal < discount.minSubtotal) ||
           (discount.products?.length && !itemsWithSubtotal.some((item) =>
             discount.products.some((p) => p.id === item.productId)
@@ -137,13 +160,13 @@ export const useStore = create<StoreState>((set, get) => ({
           throw new Error("Discount is not applicable");
         }
 
-        // Apply discount
         if (discount.type === "percentage") {
-          total = subtotal * (1 - discount.value / 100);
+          total = subtotal * (1 - discount.value / 100) + shippingCost;
         } else if (discount.type === "fixed_amount") {
-          total = Math.max(0, subtotal - discount.value);
+          total = Math.max(0, subtotal - discount.value) + shippingCost;
         } else if (discount.type === "free_shipping") {
           total = subtotal;
+          shippingCost = 0;
         }
       }
 
@@ -151,8 +174,10 @@ export const useStore = create<StoreState>((set, get) => ({
         ...order,
         items: itemsWithSubtotal,
         subtotal,
+        shippingCost,
         total,
         discount,
+        paymentReference: order.paymentReference || null,
       };
 
       const res = await fetch("/api/orders", {
@@ -172,15 +197,19 @@ export const useStore = create<StoreState>((set, get) => ({
 
   updateOrder: async (id, updatedOrder) => {
     try {
-      const { products, discounts } = get(); // Access products and discounts from the state
+      const { products, discounts } = get();
+      const { shippingOptions } = useSettingsStore.getState();
 
       let subtotal = updatedOrder.subtotal;
+      let shippingCost = updatedOrder.shippingCost;
       let total = updatedOrder.total;
       let discount: Discount | null = updatedOrder.discount || null;
+      let shippingOptionId = updatedOrder.shippingOptionId;
 
       // Recalculate subtotal if items change
+      let itemsWithSubtotal = updatedOrder.items;
       if (updatedOrder.items) {
-        const itemsWithSubtotal = updatedOrder.items.map((item) => {
+        itemsWithSubtotal = updatedOrder.items.map((item) => {
           const product = products.find((p) => p.id === item.productId);
           if (!product) throw new Error(`Product ${item.productId} not found in state`);
           return {
@@ -190,45 +219,69 @@ export const useStore = create<StoreState>((set, get) => ({
           };
         });
         subtotal = itemsWithSubtotal.reduce((sum, item) => sum + item.subtotal, 0);
-        total = subtotal;
-        updatedOrder.items = itemsWithSubtotal;
+      }
+
+      // Validate shipping option if changed
+      if (updatedOrder.shippingOptionId !== undefined) {
+        if (updatedOrder.shippingOptionId) {
+          const shippingOption = shippingOptions.find((s) => s.id === updatedOrder.shippingOptionId);
+          if (!shippingOption || shippingOption.status !== "ACTIVE") {
+            throw new Error("Invalid or inactive shipping option");
+          }
+          shippingCost = shippingOption.price;
+          if (updatedOrder.shippingCost !== undefined && updatedOrder.shippingCost !== shippingCost) {
+            throw new Error("Provided shipping cost does not match selected option");
+          }
+        } else if (updatedOrder.shippingCost !== undefined && updatedOrder.shippingCost !== 0) {
+          throw new Error("Shipping cost provided without shipping option");
+        } else {
+          shippingCost = 0;
+        }
       }
 
       // Validate and apply discount if discountId changes
-      if (updatedOrder.discountId) {
+      if (updatedOrder.discountId !== undefined) {
         discount = discounts.find((d) => d.id === updatedOrder.discountId) ?? null;
-        if (!discount) throw new Error("Invalid discount");
+        if (updatedOrder.discountId && !discount) throw new Error("Invalid discount");
 
-        if (
-          !discount.isActive ||
-          (discount.usageLimit && discount.usageCount >= discount.usageLimit) ||
-          (discount.startsAt && new Date() < new Date(discount.startsAt)) ||
-          (discount.endsAt && new Date() > new Date(discount.endsAt)) ||
-          (discount.minSubtotal && subtotal! < discount.minSubtotal) ||
-          (discount.products?.length && !updatedOrder.items?.some((item) =>
-            discount?.products?.some((p) => p.id === item.productId)
-          ))
-        ) {
-          throw new Error("Discount is not applicable");
-        }
+        if (discount) {
+          if (
+            !discount.isActive ||
+            (discount.usageLimit && discount.usageCount >= discount.usageLimit) ||
+            (discount.startsAt && new Date() < new Date(discount.startsAt)) ||
+            (discount.endsAt && new Date() > new Date(discount.endsAt)) ||
+            (discount.minSubtotal && subtotal! < discount.minSubtotal) ||
+            (discount.products?.length && !itemsWithSubtotal?.some((item) =>
+              discount?.products?.some((p) => p.id === item.productId)
+            ))
+          ) {
+            throw new Error("Discount is not applicable");
+          }
 
-        if (discount.type === "percentage") {
-          total = subtotal! * (1 - discount.value / 100);
-        } else if (discount.type === "fixed_amount") {
-          total = Math.max(0, subtotal! - discount.value);
-        } else if (discount.type === "free_shipping") {
-          total = subtotal!;
+          if (discount.type === "percentage") {
+            total = subtotal! * (1 - discount.value / 100) + (shippingCost || 0);
+          } else if (discount.type === "fixed_amount") {
+            total = Math.max(0, subtotal! - discount.value) + (shippingCost || 0);
+          } else if (discount.type === "free_shipping") {
+            total = subtotal!;
+            shippingCost = 0;
+          }
+        } else {
+          total = subtotal! + (shippingCost || 0);
         }
-      } else if (updatedOrder.discountId === null) {
-        total = subtotal!;
-        discount = null;
+      } else if (subtotal !== undefined) {
+        total = subtotal + (shippingCost || 0);
       }
 
       const updated = {
         ...updatedOrder,
+        items: itemsWithSubtotal,
         subtotal,
+        shippingOptionId,
+        shippingCost,
         total,
         discount,
+        paymentReference: updatedOrder.paymentReference ?? null,
       };
 
       const res = await fetch(`/api/orders/${id}`, {

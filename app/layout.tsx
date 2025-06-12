@@ -22,6 +22,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
+        <script src="https://js.paystack.co/v1/inline.js" async></script>
         <ThemeProvider
           attribute="class"
           defaultTheme="light"

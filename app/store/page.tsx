@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,13 +18,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Search, Filter } from "lucide-react";
-import { mockProducts } from "@/lib/mock-data";
+import { Search, Filter, Loader2 } from "lucide-react";
 import { useCart } from "@/contexts/cart-context";
 import { StoreHeader } from "./components/store-header";
 import { useToast } from "@/hooks/use-toast";
 import type { Product } from "@/types";
 import { Toaster } from "@/components/ui/toaster";
+import { useStore } from "@/store/store"; // Adjust path as needed
 
 const ITEMS_PER_PAGE = 9;
 
@@ -32,22 +32,38 @@ export default function StorePage() {
   const { addItem } = useCart();
   const { toast } = useToast();
   const [currentPage, setCurrentPage] = useState(1);
-  const [selectedVariants, setSelectedVariants] = useState<
-    Record<string, string>
-  >({});
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
+  const [isLoading, setIsLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  // Use mock products directly
-  const products = mockProducts;
+  // Get products from store
+  const { products, fetchProducts } = useStore();
 
-  // Get unique categories
+  // Fetch products on component mount if not already loaded
+  useEffect(() => {
+    const products = useStore.getState().products;
+    if (!products || products.length === 0) {
+      useStore
+        .getState()
+        .fetchProducts()
+        .then(() => {
+          const updatedProducts = useStore.getState().products;
+          console.log("[FETCHED_PRODUCTS]", updatedProducts);
+          setLoading(false);
+        });
+    } else {
+      setLoading(false);
+    }
+  }, []);
+
+  // Get unique categories from real products
   const categories = [
     "all",
     ...Array.from(new Set(products.map((p) => p.category))),
   ];
 
-  // Filter products
+  // Filter products - only show products with inventory > 0
   const filteredProducts = products.filter((product) => {
     const matchesSearch =
       product.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -75,6 +91,25 @@ export default function StorePage() {
       description: `${product.title} has been added to your cart.`,
     });
   };
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedCategory]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <StoreHeader />
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-green-600" />
+            <p className="text-gray-600">Loading products...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -158,9 +193,15 @@ export default function StorePage() {
         {currentProducts.length === 0 ? (
           <div className="text-center py-12">
             <div className="bg-white rounded-lg shadow-sm border p-8">
-              <p className="text-gray-500 text-lg mb-2">No products found</p>
+              <p className="text-gray-500 text-lg mb-2">
+                {products.length === 0
+                  ? "No products available"
+                  : "No products found"}
+              </p>
               <p className="text-gray-400">
-                Try adjusting your search or filter criteria
+                {products.length === 0
+                  ? "Add some products to get started"
+                  : "Try adjusting your search or filter criteria"}
               </p>
             </div>
           </div>
@@ -174,15 +215,17 @@ export default function StorePage() {
                 >
                   <CardHeader className="p-0">
                     <div className="relative h-48 w-full bg-gray-100">
-                      {/* <Image
+                      <Image
                         src={
-                          product.thumbnail ||
+                          product.imageUrl ||
                           "/placeholder.svg?height=200&width=300"
                         }
                         alt={product.title}
                         fill
                         className="object-cover"
-                      /> */}
+                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                        priority={false}
+                      />
                       <div className="absolute top-3 right-3">
                         <Badge
                           variant="secondary"
@@ -208,15 +251,15 @@ export default function StorePage() {
 
                     <div className="flex items-center justify-between mb-4">
                       <span className="text-2xl font-bold text-green-600">
-                        ${(product.price / 100).toFixed(2)}
+                        ₦{product.price.toLocaleString()}
                       </span>
                     </div>
 
                     {product.tags && product.tags.length > 0 && (
                       <div className="mb-4">
-                        {product.tags.slice(0, 3).map((tag) => (
+                        {product.tags.slice(0, 3).map((tag, index) => (
                           <Badge
-                            key={tag}
+                            key={`${tag}-${index}`}
                             variant="outline"
                             className="mr-1 mb-1 text-xs"
                           >

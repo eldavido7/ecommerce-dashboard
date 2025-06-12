@@ -31,6 +31,8 @@ export async function POST(req: Request) {
             category,
             tags,
             barcode,
+            imageUrl,
+            imagePublicId,
         } = body;
 
         // Generate a unique barcode if not provided
@@ -56,6 +58,8 @@ export async function POST(req: Request) {
                 category,
                 tags,
                 barcode: finalBarcode,
+                imageUrl,
+                imagePublicId,
             },
         });
 
@@ -69,11 +73,11 @@ export async function POST(req: Request) {
 }
 
 // PUT - Update a product
-export async function PUT(req: Request) {
+export async function PUT(req: Request, { params }: { params: { id: string } }) {
     try {
+        const { id } = params; // Get id from URL
         const body = await req.json();
         const {
-            id,
             title,
             description,
             price,
@@ -81,7 +85,19 @@ export async function PUT(req: Request) {
             category,
             tags,
             barcode,
+            imageUrl,
+            imagePublicId,
         } = body;
+
+        // Validate required fields
+        if (!id || !title || !description || !category) {
+            return new NextResponse("Missing required fields", { status: 400 });
+        }
+
+        const existingProduct = await prisma.product.findUnique({ where: { id } });
+        if (!existingProduct) {
+            return new NextResponse("Product not found", { status: 404 });
+        }
 
         const updatedProduct = await prisma.product.update({
             where: { id },
@@ -93,6 +109,8 @@ export async function PUT(req: Request) {
                 category,
                 tags,
                 barcode,
+                imageUrl: imageUrl ?? existingProduct.imageUrl, // Preserve existing if not provided
+                imagePublicId: imagePublicId ?? existingProduct.imagePublicId, // Preserve existing
             },
         });
 
