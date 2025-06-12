@@ -44,6 +44,9 @@ export default function CartPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [discountCode, setDiscountCode] = useState("");
   const [appliedDiscount, setAppliedDiscount] = useState<Discount | null>(null);
+  const [discountsLoading, DiscountsSetLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
+
   const [selectedShippingOptionId, setSelectedShippingOptionId] = useState<
     string | null
   >(null);
@@ -67,13 +70,40 @@ export default function CartPage() {
 
   // Fetch shipping options and discounts if not loaded
   useEffect(() => {
+    const discounts = useStore.getState().discounts;
+    if (!discounts || discounts.length === 0) {
+      useStore
+        .getState()
+        .fetchDiscounts()
+        .then(() => {
+          const updatedDiscounts = useStore.getState().discounts;
+          console.log("[FETCHED_DISCOUNTS]", updatedDiscounts);
+          DiscountsSetLoading(false);
+        });
+    } else {
+      DiscountsSetLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
     if (shippingOptions.length === 0) {
-      fetchSettings();
+      fetchSettings()
+        .then(() => {
+          setLoading(false);
+        })
+        .catch((error) => {
+          console.error("Fetch settings error:", error);
+          setLoading(false);
+          toast({
+            title: "Error",
+            description: "Failed to fetch settings. Please try again.",
+            variant: "destructive",
+          });
+        });
+    } else {
+      setLoading(false);
     }
-    if (discounts.length === 0) {
-      fetchDiscounts();
-    }
-  }, [shippingOptions.length, discounts.length, fetchSettings, fetchDiscounts]);
+  }, []);
 
   // Calculate totals (in kobo for Paystack, displayed in Naira)
   const subtotal = total; // In kobo

@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/dialog";
 import { format } from "date-fns";
 import type { Order } from "@/types";
+import { useSettingsStore } from "@/store/store";
 
 interface ViewOrderModalProps {
   open: boolean;
@@ -42,6 +43,31 @@ export function ViewOrderModal({
   onUpdateStatus,
 }: ViewOrderModalProps) {
   if (!order) return null;
+
+  const [loading, setLoading] = useState(true);
+
+  const { shippingOptions, fetchSettings } = useSettingsStore();
+
+  const selectedShippingOption = shippingOptions.find(
+    (option) => option.id === order.shippingOptionId
+  );
+
+  useEffect(() => {
+    const shippingOptions = useSettingsStore.getState().shippingOptions;
+    if (!shippingOptions || shippingOptions.length === 0) {
+      useSettingsStore
+        .getState()
+        .fetchSettings()
+        .then(() => {
+          const updatedShippingOptions =
+            useSettingsStore.getState().shippingOptions;
+          console.log("[FETCHED_SHIPPING_OPTIONS]", updatedShippingOptions);
+          setLoading(false);
+        });
+    } else {
+      setLoading(false);
+    }
+  }, []);
 
   const originalTotal = order.items.reduce(
     (sum, item) => sum + item.subtotal,
@@ -211,6 +237,20 @@ export function ViewOrderModal({
                     {order.postalCode}
                   </p>
                   <p>{order.country}</p>
+                </div>
+                <div className="text-sm mt-4">
+                  <h4 className="font-medium">Shipping Option</h4>
+                  {order.shippingOptionId && selectedShippingOption ? (
+                    <p>
+                      {selectedShippingOption.name} (₦
+                      {order.shippingCost?.toLocaleString() || "0.00"} -{" "}
+                      {selectedShippingOption.deliveryTime})
+                    </p>
+                  ) : (
+                    <p>No shipping option selected</p>
+                  )}
+                  <h4 className="font-medium mt-2">Payment Reference</h4>
+                  <p>{order.paymentReference || "N/A"}</p>
                 </div>
               </CardContent>
             </Card>

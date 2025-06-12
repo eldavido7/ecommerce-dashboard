@@ -99,8 +99,7 @@ export default function SettingsPage() {
   } = useSettingsStore();
 
   useEffect(() => {
-    // if (users.length === 0 || shippingOptions.length === 0) {
-    if (users.length === 0) {
+    if (users.length === 0 || shippingOptions.length === 0) {
       fetchSettings()
         .then(() => {
           setLoading(false);
