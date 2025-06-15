@@ -479,7 +479,7 @@ export default function AnalyticsPage() {
             </Card>
           </div>
 
-          <Card>
+          <Card className="">
             <CardHeader>
               <CardTitle>Product Performance Matrix</CardTitle>
               <CardDescription>Revenue vs. Units Sold</CardDescription>
@@ -492,8 +492,12 @@ export default function AnalyticsPage() {
                       <TableHead>Product</TableHead>
                       <TableHead className="text-right">Units Sold</TableHead>
                       <TableHead className="text-right">Revenue</TableHead>
-                      <TableHead className="text-right">Avg. Price</TableHead>
-                      <TableHead className="text-right">Performance</TableHead>
+                      <TableHead className="hidden md:table-cell text-right">
+                        Avg. Price
+                      </TableHead>
+                      <TableHead className="hidden md:table-cell text-center">
+                        Performance
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -508,10 +512,10 @@ export default function AnalyticsPage() {
                         <TableCell className="text-right">
                           ₦{product.revenue.toFixed(2)}
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="hidden md:table-cell text-right">
                           ₦{product.avgPrice.toFixed(2)}
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="hidden md:table-cell text-center">
                           <span
                             className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                               product.performance === "High"

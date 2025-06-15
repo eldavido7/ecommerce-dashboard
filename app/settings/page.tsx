@@ -297,8 +297,12 @@ export default function SettingsPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Name</TableHead>
-                      <TableHead>Price</TableHead>
-                      <TableHead>Delivery Time</TableHead>
+                      <TableHead className="hidden md:table-cell">
+                        Price
+                      </TableHead>
+                      <TableHead className="hidden md:table-cell">
+                        Delivery Time
+                      </TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
@@ -309,8 +313,12 @@ export default function SettingsPage() {
                         <TableCell className="font-medium">
                           {option.name}
                         </TableCell>
-                        <TableCell>₦{option.price}</TableCell>
-                        <TableCell>{option.deliveryTime}</TableCell>
+                        <TableCell className="hidden md:table-cell">
+                          ₦{option.price}
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell">
+                          {option.deliveryTime}
+                        </TableCell>
                         <TableCell>
                           <span
                             className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
@@ -424,7 +432,9 @@ export default function SettingsPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Name</TableHead>
-                      <TableHead>Email</TableHead>
+                      <TableHead className="hidden md:table-cell">
+                        Email
+                      </TableHead>
                       <TableHead>Last Active</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
@@ -438,7 +448,9 @@ export default function SettingsPage() {
                             {user.name}
                           </div>
                         </TableCell>
-                        <TableCell>{user.email}</TableCell>
+                        <TableCell className="hidden md:table-cell">
+                          {user.email}
+                        </TableCell>
                         <TableCell>
                           {(() => {
                             const date = new Date(user.lastActive);

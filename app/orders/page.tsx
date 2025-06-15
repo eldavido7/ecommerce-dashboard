@@ -53,6 +53,8 @@ export default function OrdersPage() {
   const [viewOrderOpen, setViewOrderOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   // Filter orders based on search query and status filter
   const filteredOrders = useMemo(() => {
@@ -71,6 +73,11 @@ export default function OrdersPage() {
       return matchesSearch && matchesStatus;
     });
   }, [orders, searchQuery, statusFilter]);
+
+  const paginatedOrders = filteredOrders.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   useEffect(() => {
     const orders = useStore.getState().orders;
@@ -145,7 +152,7 @@ export default function OrdersPage() {
   const handleUpdateStatus = async (orderId: string, newStatus: string) => {
     const orderToUpdate = orders.find((o) => o.id === orderId);
     if (!orderToUpdate) return;
-  
+
     const payload = {
       firstName: orderToUpdate.firstName,
       lastName: orderToUpdate.lastName,
@@ -165,7 +172,7 @@ export default function OrdersPage() {
         quantity: item.quantity,
       })),
     };
-  
+
     try {
       const res = await fetch(`/api/orders/${orderId}`, {
         method: "PATCH",
@@ -174,17 +181,22 @@ export default function OrdersPage() {
         },
         body: JSON.stringify(payload),
       });
-  
+
       if (!res.ok) throw new Error("Failed to update order");
-  
+
       // ✅ Send email notification after successful status update
       try {
-        console.log('Sending email to:', orderToUpdate.email, 'for order:', orderId);
-        
-        const emailRes = await fetch('/api/email', {
-          method: 'POST',
+        console.log(
+          "Sending email to:",
+          orderToUpdate.email,
+          "for order:",
+          orderId
+        );
+
+        const emailRes = await fetch("/api/email", {
+          method: "POST",
           headers: {
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
           },
           body: JSON.stringify({
             email: orderToUpdate.email,
@@ -201,28 +213,28 @@ export default function OrdersPage() {
               postalCode: orderToUpdate.postalCode,
               country: orderToUpdate.country,
               shippingCost: orderToUpdate.shippingCost,
-            }
+            },
           }),
         });
-  
+
         const emailResult = await emailRes.json();
-        
+
         if (!emailRes.ok) {
-          console.error('Failed to send email notification:', emailResult);
+          console.error("Failed to send email notification:", emailResult);
           // Don't throw error here - we don't want email failure to affect the main flow
         } else {
-          console.log('Email sent successfully:', emailResult);
+          console.log("Email sent successfully:", emailResult);
         }
       } catch (emailError) {
-        console.error('Email sending error:', emailError);
+        console.error("Email sending error:", emailError);
         // Email failure shouldn't break the status update flow
       }
-  
+
       toast({
         title: "Order Status Updated",
         description: `Order #${orderId} status has been updated to ${newStatus}`,
       });
-  
+
       async function fetchOrders() {
         try {
           await useStore.getState().fetchOrders();
@@ -235,7 +247,7 @@ export default function OrdersPage() {
           });
         }
       }
-  
+
       // ✅ Refresh orders to reflect updated status
       await fetchOrders();
     } catch (err) {
@@ -280,22 +292,18 @@ export default function OrdersPage() {
         </Button>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>All Orders</CardTitle>
-          <CardDescription>View and manage all customer orders</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between mb-4">
-            <div className="relative w-64">
-              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Customer name or order ID..."
-                className="pl-8"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
+      <Card className="border-0 md:border md:p-4">
+        <div className="md:flex flex-1 items-center justify-between mb-4">
+          <div className="relative w-64">
+            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Customer name or order ID..."
+              className="pl-8"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+          <div className="mt-4 md:mt-0">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm">
@@ -330,17 +338,23 @@ export default function OrdersPage() {
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
+        </div>
 
-          <div className="rounded-md border">
-            <Table>
+        <div className="rounded-md border md:max-w-full max-w-[380px]">
+          <div className="overflow-x-auto">
+            <Table className="w-full">
               <TableHeader>
                 <TableRow>
-                  <TableHead>Order ID</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead className="hidden md:table-cell text-left">
+                    Order ID
+                  </TableHead>
+                  <TableHead className="hidden md:table-cell">Date</TableHead>
+                  <TableHead className="table-cell">Customer</TableHead>
+                  <TableHead className="hidden md:table-cell text-center">
+                    Status
+                  </TableHead>
                   <TableHead>Total</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="md:text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -351,21 +365,23 @@ export default function OrdersPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredOrders.map((order) => (
+                  paginatedOrders.map((order) => (
                     <TableRow key={order.id}>
-                      <TableCell className="font-medium">{order.id}</TableCell>
-                      <TableCell>
+                      <TableCell className="font-medium hidden md:table-cell text-left">
+                        {order.id}
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell">
                         {format(new Date(order.createdAt), "MMM d, yyyy")}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="md:w-auto w-[100px] break-all break-words">
                         {`${order.firstName} ${order.lastName}`}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden md:table-cell text-center">
                         <Badge className={getStatusColor(order.status)}>
                           {order.status}
                         </Badge>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="md:w-auto w-[100px] break-words">
                         <div>
                           <div>₦{order.total.toLocaleString()}</div>
                           {order.discount && (
@@ -375,7 +391,7 @@ export default function OrdersPage() {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="md:w-auto w-[50px]">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon">
@@ -405,10 +421,39 @@ export default function OrdersPage() {
               </TableBody>
             </Table>
           </div>
-        </CardContent>
-        <CardFooter className="flex justify-between">
+        </div>
+        <CardFooter className="md:flex grid justify-between pt-8">
           <div className="text-sm text-muted-foreground">
-            Showing {filteredOrders.length} of {orders.length} orders
+            Showing {paginatedOrders.length} of {orders.length} orders
+          </div>
+          <div className="flex justify-between items-center md:mt-0 mt-4">
+            <Button
+              variant="outline"
+              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+            >
+              Previous
+            </Button>
+            <span className="mx-2">
+              Page {currentPage} of{" "}
+              {Math.ceil(paginatedOrders.length / itemsPerPage)}
+            </span>
+            <Button
+              variant="outline"
+              onClick={() =>
+                setCurrentPage((prev) =>
+                  Math.min(
+                    prev + 1,
+                    Math.ceil(paginatedOrders.length / itemsPerPage)
+                  )
+                )
+              }
+              disabled={
+                currentPage === Math.ceil(paginatedOrders.length / itemsPerPage)
+              }
+            >
+              Next
+            </Button>
           </div>
         </CardFooter>
       </Card>

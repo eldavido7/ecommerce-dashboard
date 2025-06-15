@@ -63,9 +63,9 @@ export function MainLayout({ children }: MainLayoutProps) {
         <Header onMenuClick={() => setSidebarOpen(true)} />
         <div className="grid md:grid-cols-[240px_1fr]">
           <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-          <main className="overflow-hidden">
+          <main className="min-w-0">
             <ScrollArea className="h-[calc(100vh-4rem)]">
-              <div className="container mx-auto p-0">{children}</div>
+              <div className="w-full">{children}</div>
             </ScrollArea>
           </main>
         </div>

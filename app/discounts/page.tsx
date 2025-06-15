@@ -213,7 +213,7 @@ export default function DiscountsPage() {
         </TabsList>
 
         <div className="flex items-center mt-4">
-          <div className="relative w-full md:w-80">
+          <div className="relative w-80">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               type="search"
@@ -226,17 +226,19 @@ export default function DiscountsPage() {
         </div>
 
         <TabsContent value="discounts" className="space-y-4">
-          <div className="rounded-md border">
+          <div className="rounded-md border md:max-w-full max-w-[380px]">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Code</TableHead>
-                  <TableHead>Type</TableHead>
+                  <TableHead className="hidden md:table-cell">Type</TableHead>
                   <TableHead>Value</TableHead>
                   <TableHead>Usage</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Dates</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="hidden md:table-cell text-center">
+                    Dates
+                  </TableHead>
+                  <TableHead className="text-left">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -245,7 +247,7 @@ export default function DiscountsPage() {
                     <TableCell className="font-medium">
                       {discount.code}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden md:table-cell text-center">
                       {discount.type === "percentage" ? (
                         <span className="flex items-center">
                           <Percent className="h-4 w-4 mr-1" />
@@ -267,7 +269,7 @@ export default function DiscountsPage() {
                       {discount.type === "percentage"
                         ? `${discount.value}%`
                         : discount.type === "fixed_amount"
-                        ? `₦${discount.value.toFixed(2)}`
+                        ? `₦${discount.value}`
                         : "Free"}
                     </TableCell>
                     <TableCell>
@@ -285,7 +287,7 @@ export default function DiscountsPage() {
                         {discount.isActive ? "Active" : "Inactive"}
                       </span>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden md:table-cell text-center">
                       <div className="text-xs">
                         <div>
                           Start: {format(discount.startsAt, "MMM dd, yyyy")}
@@ -297,7 +299,7 @@ export default function DiscountsPage() {
                         )}
                       </div>
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-left">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" className="h-8 w-8 p-0">

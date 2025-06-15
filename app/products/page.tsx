@@ -54,6 +54,8 @@ export default function ProductsPage() {
   const [isBarcodeDialogOpen, setIsBarcodeDialogOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   useEffect(() => {
     const products = useStore.getState().products;
@@ -117,6 +119,11 @@ export default function ProductsPage() {
       product.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       product.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
       product.category.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const paginatedProducts = filteredProducts.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
   );
 
   const handleEditProduct = (product: Product) => {
@@ -183,17 +190,21 @@ export default function ProductsPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Name</TableHead>
-              <TableHead>Category</TableHead>
+              <TableHead className="hidden md:table-cell text-center">
+                Category
+              </TableHead>
               <TableHead className="text-right">Price</TableHead>
               <TableHead className="text-right">Inventory</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredProducts.map((product) => (
+            {paginatedProducts.map((product) => (
               <TableRow key={product.id}>
                 <TableCell className="font-medium">{product.title}</TableCell>
-                <TableCell>{product.category}</TableCell>
+                <TableCell className="hidden md:table-cell text-center">
+                  {product.category}
+                </TableCell>
                 <TableCell className="text-right">
                   ₦{product.price.toFixed(2)}
                 </TableCell>
@@ -248,6 +259,41 @@ export default function ProductsPage() {
             ))}
           </TableBody>
         </Table>
+        <div className="">
+          <div className="text-sm text-muted-foreground text-center ml-4 mt-4">
+            Showing {paginatedProducts.length} of {products.length} products
+          </div>
+          <div className="flex justify-between items-center p-4">
+            <Button
+              variant="outline"
+              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+            >
+              Previous
+            </Button>
+            <span>
+              Page {currentPage} of{" "}
+              {Math.ceil(filteredProducts.length / itemsPerPage)}
+            </span>
+            <Button
+              variant="outline"
+              onClick={() =>
+                setCurrentPage((prev) =>
+                  Math.min(
+                    prev + 1,
+                    Math.ceil(filteredProducts.length / itemsPerPage)
+                  )
+                )
+              }
+              disabled={
+                currentPage ===
+                Math.ceil(filteredProducts.length / itemsPerPage)
+              }
+            >
+              Next
+            </Button>
+          </div>
+        </div>
       </div>
 
       {/* Modals */}
