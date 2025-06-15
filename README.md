@@ -105,6 +105,39 @@ npm run dev
 ```
 Visit http://localhost:3000 to view the app locally.
 
+---
+
+## 👤 Admin User Setup (Important!)
+
+Before logging into the admin dashboard, you need to manually create your first admin user.
+
+### Option 1: Directly in the Database
+Use a database GUI like **Neon**, **pgAdmin**, or **TablePlus** to insert a new user into the `User` table.
+
+- Make sure the password is **hashed** using **bcrypt** (10-digit salt)
+- You can generate the hash using a tool like https://bcrypt-generator.com or via Node.js:
+
+```bash
+const bcrypt = require('bcrypt');
+bcrypt.hash('your-password', 10).then(console.log);
+```
+### Option 2: Use the API Endpoint
+Make a POST request (using postman or any tool like that) to:
+```bash
+POST your-endpoint/api/settings/users or https://localhost:3000/api/settings/users
+```
+With the following JSON body:
+```bash
+{
+  "name": "Admin",
+  "email": "admin@example.com",
+  "password": "$2b$10$yourHashedPasswordHere"
+}
+```
+❗ Do not send a plain-text password. The password must already be bcrypt-hashed before sending.
+
+---
+
 ### 🖼 Image Uploads via Cloudinary
 - Admins can upload product images when creating or editing.
 - Images are uploaded to Cloudinary and served via CDN.
