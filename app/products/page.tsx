@@ -39,14 +39,8 @@ import { Card } from "@tremor/react";
 import { CardContent, CardHeader } from "@/components/ui/card";
 
 export default function ProductsPage() {
-  const {
-    products,
-    fetchProducts,
-    addProduct,
-    updateProduct,
-    deleteProduct,
-    orders,
-  } = useStore();
+  const { products, addProduct, updateProduct, deleteProduct, orders } =
+    useStore();
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);

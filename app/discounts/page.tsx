@@ -66,6 +66,8 @@ export default function DiscountsPage() {
   const [selectedDiscount, setSelectedDiscount] = useState<Discount | null>(
     null
   );
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   useEffect(() => {
     const discounts = useStore.getState().discounts;
@@ -129,6 +131,11 @@ export default function DiscountsPage() {
       discount.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (discount.description &&
         discount.description.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
+
+  const paginatedDiscounts = filteredDiscounts.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
   );
 
   const handleAddDiscount = async (discountData: Discount) => {
@@ -242,7 +249,7 @@ export default function DiscountsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredDiscounts.map((discount) => (
+                {paginatedDiscounts.map((discount) => (
                   <TableRow key={discount.id}>
                     <TableCell className="font-medium">
                       {discount.code}
@@ -330,6 +337,42 @@ export default function DiscountsPage() {
             </Table>
           </div>
         </TabsContent>
+
+        <div className="">
+          <div className="text-sm text-muted-foreground text-center ml-4 mt-4">
+            Showing {paginatedDiscounts.length} of {discounts.length} discounts
+          </div>
+          <div className="flex justify-between items-center p-4">
+            <Button
+              variant="outline"
+              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+            >
+              Previous
+            </Button>
+            <span>
+              Page {currentPage} of{" "}
+              {Math.ceil(filteredDiscounts.length / itemsPerPage)}
+            </span>
+            <Button
+              variant="outline"
+              onClick={() =>
+                setCurrentPage((prev) =>
+                  Math.min(
+                    prev + 1,
+                    Math.ceil(filteredDiscounts.length / itemsPerPage)
+                  )
+                )
+              }
+              disabled={
+                currentPage ===
+                Math.ceil(filteredDiscounts.length / itemsPerPage)
+              }
+            >
+              Next
+            </Button>
+          </div>
+        </div>
       </Tabs>
 
       {/* Modals */}

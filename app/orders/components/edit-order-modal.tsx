@@ -490,7 +490,7 @@ export function EditOrderModal({
           </div>
 
           {/* Order Status */}
-          <div className="grid gap-2">
+          {/* <div className="grid gap-2">
             <h3 className="text-lg font-medium">Order Status</h3>
             <Select
               value={status || ""}
@@ -507,7 +507,7 @@ export function EditOrderModal({
                 <SelectItem value="CANCELED">Canceled</SelectItem>
               </SelectContent>
             </Select>
-          </div>
+          </div> */}
 
           {/* Discount */}
           <div className="grid gap-2">

@@ -44,6 +44,8 @@ export default function InventoryPage() {
   const [newInventory, setNewInventory] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [scannedBarcode, setScannedBarcode] = useState(""); // New state for barcode input
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   // Fetch products if not loaded
   useEffect(() => {
@@ -106,6 +108,11 @@ export default function InventoryPage() {
       : true;
     return matchesSearch && matchesCategory;
   });
+
+  const paginatedProducts = filteredProducts.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   // Get unique categories
   const categories = Array.from(
@@ -236,7 +243,7 @@ export default function InventoryPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredProducts.map((product) => (
+            {paginatedProducts.map((product) => (
               <TableRow key={product.id}>
                 <TableCell className="font-medium">{product.title}</TableCell>
                 <TableCell className="text-right">
@@ -320,6 +327,41 @@ export default function InventoryPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <div className="">
+        <div className="text-sm text-muted-foreground text-center ml-4 mt-4">
+          Showing {paginatedProducts.length} of {products.length} products
+        </div>
+        <div className="flex justify-between items-center p-4">
+          <Button
+            variant="outline"
+            onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+            disabled={currentPage === 1}
+          >
+            Previous
+          </Button>
+          <span>
+            Page {currentPage} of{" "}
+            {Math.ceil(filteredProducts.length / itemsPerPage)}
+          </span>
+          <Button
+            variant="outline"
+            onClick={() =>
+              setCurrentPage((prev) =>
+                Math.min(
+                  prev + 1,
+                  Math.ceil(filteredProducts.length / itemsPerPage)
+                )
+              )
+            }
+            disabled={
+              currentPage === Math.ceil(filteredProducts.length / itemsPerPage)
+            }
+          >
+            Next
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
