@@ -115,7 +115,7 @@ export default function CartPage() {
   // In kobo
   const discountAmount = appliedDiscount
     ? appliedDiscount.type === "percentage"
-      ? Math.round(subtotal * appliedDiscount.value)
+      ? Math.round((subtotal * appliedDiscount.value) / 100)
       : appliedDiscount.type === "fixed_amount"
       ? appliedDiscount.value
       : appliedDiscount.type === "free_shipping"
@@ -261,6 +261,17 @@ export default function CartPage() {
       }
     }
 
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(customerInfo.email)) {
+      toast({
+        title: "Invalid email address",
+        description: "Please enter a valid email address.",
+        variant: "destructive",
+      });
+      return false;
+    }
+
     // Check shipping address
     const requiredShippingFields = [
       "address",
@@ -280,6 +291,16 @@ export default function CartPage() {
         });
         return false;
       }
+    }
+
+    // Postal code numeric validation
+    if (!/^\d+$/.test(shippingAddress.postalCode)) {
+      toast({
+        title: "Invalid postal code",
+        description: "Postal code must contain numbers only.",
+        variant: "destructive",
+      });
+      return false;
     }
 
     if (!selectedShippingOptionId) {

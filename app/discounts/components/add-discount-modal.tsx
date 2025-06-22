@@ -25,6 +25,7 @@ import {
 import type { Discount } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { X } from "lucide-react";
+import { toast } from "@/components/ui/use-toast";
 
 interface AddDiscountModalProps {
   open: boolean;
@@ -56,6 +57,34 @@ export function AddDiscountModal({
   });
 
   const handleAddDiscount = () => {
+    // Frontend validation for percentage type
+    if (
+      newDiscount.type === "percentage" &&
+      (typeof newDiscount.value !== "number" ||
+        newDiscount.value < 1 ||
+        newDiscount.value > 100)
+    ) {
+      toast({
+        title: "Invalid Percentage Value",
+        description: "Percentage value must be between 1 and 100.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Frontend validation for fixed amount type
+    if (
+      newDiscount.type === "fixed_amount" &&
+      (typeof newDiscount.value !== "number" || newDiscount.value <= 0)
+    ) {
+      toast({
+        title: "Invalid Fixed Amount",
+        description: "Fixed amount value must be greater than 0.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const discountToAdd = {
       id: `disc_${Math.random().toString(36).substring(2, 10)}`,
       code: newDiscount.code!,
@@ -152,7 +181,7 @@ export function AddDiscountModal({
             </Label>
             <Textarea
               id="description"
-              value={newDiscount.description}
+              value={newDiscount.description ?? ""}
               onChange={(e) =>
                 setNewDiscount({ ...newDiscount, description: e.target.value })
               }
@@ -167,7 +196,8 @@ export function AddDiscountModal({
             </Label>
             <Select
               onValueChange={(
-                value: "percentage" | "fixed_amount" | "free_shipping"
+                value: "percentage" | "fixed_amount"
+                // | "free_shipping"
               ) => setNewDiscount({ ...newDiscount, type: value })}
               defaultValue={newDiscount.type}
             >
@@ -177,7 +207,7 @@ export function AddDiscountModal({
               <SelectContent>
                 <SelectItem value="percentage">Percentage</SelectItem>
                 <SelectItem value="fixed_amount">Fixed Amount</SelectItem>
-                <SelectItem value="free_shipping">Free Shipping</SelectItem>
+                {/* <SelectItem value="free_shipping">Free Shipping</SelectItem> */}
               </SelectContent>
             </Select>
           </div>
@@ -190,12 +220,19 @@ export function AddDiscountModal({
               id="value"
               type="number"
               value={newDiscount.value}
-              onChange={(e) =>
+              min={newDiscount.type === "percentage" ? 1 : undefined}
+              max={newDiscount.type === "percentage" ? 100 : undefined}
+              onChange={(e) => {
+                let value = parseFloat(e.target.value);
+                if (newDiscount.type === "percentage") {
+                  if (value > 100) value = 100;
+                  if (value < 1) value = 1;
+                }
                 setNewDiscount({
                   ...newDiscount,
-                  value: parseFloat(e.target.value),
-                })
-              }
+                  value,
+                });
+              }}
               className="col-span-3"
               placeholder={newDiscount.type === "percentage" ? "20" : "10.00"}
             />
@@ -244,14 +281,14 @@ export function AddDiscountModal({
             <Input
               id="minSubtotal"
               type="number"
-              value={newDiscount.conditions?.minSubtotal}
+              value={newDiscount.minSubtotal ?? ""}
               onChange={(e) =>
                 setNewDiscount({
                   ...newDiscount,
-                  conditions: {
-                    ...newDiscount.conditions!,
-                    minSubtotal: parseFloat(e.target.value),
-                  },
+                  minSubtotal:
+                    e.target.value === ""
+                      ? undefined
+                      : parseFloat(e.target.value),
                 })
               }
               className="col-span-3"
@@ -308,7 +345,7 @@ export function AddDiscountModal({
             <Input
               id="usageLimit"
               type="number"
-              value={newDiscount.usageLimit}
+              value={newDiscount.usageLimit ?? ""}
               onChange={(e) =>
                 setNewDiscount({
                   ...newDiscount,
